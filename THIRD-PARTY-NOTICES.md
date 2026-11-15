@@ -4,7 +4,7 @@
 
 ## 许可范围
 
-- 根目录的 `LICENSE` 适用于本仓库里版权人自己的内容：`SKILL.md`、`README.md`、`CHANGELOG.md`、`references/`、`scripts/`、`tests/`、`examples/` 和 `graph-runtime/`。
+- 根目录的 `LICENSE` 适用于本仓库里版权人自己的内容：`SKILL.md`、`README.md`、`CHANGELOG.md`、`references/`、`scripts/`、`tests/`、`examples/`、`graph-runtime/` 和 `docs/images/`（README 用的图标和题图）。
 - 下面列出的第三方组件不算进版权人的版权声明，各按自己的许可，版权归各自的权利人。
 
 ## 包里带的第三方组件
