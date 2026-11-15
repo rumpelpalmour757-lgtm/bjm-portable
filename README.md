@@ -24,16 +24,16 @@
 
 <p align="center">
   <a href="https://github.com/rumpelpalmour757-lgtm/bjm-portable/stargazers"><img alt="Stars" src="https://img.shields.io/github/stars/rumpelpalmour757-lgtm/bjm-portable?style=flat-square&color=23766A&logo=github&logoColor=white&label=Stars"></a>
-  <a href="CHANGELOG.md"><img alt="版本 v1.4.1" src="https://img.shields.io/badge/%E7%89%88%E6%9C%AC-v1.4.1-1F2A44?style=flat-square"></a>
+  <a href="CHANGELOG.md"><img alt="版本 v1.5.1" src="https://img.shields.io/badge/%E7%89%88%E6%9C%AC-v1.5.1-1F2A44?style=flat-square"></a>
   <a href="references/bjm-v3.2.md"><img alt="协议 BJM v3.2" src="https://img.shields.io/badge/%E5%8D%8F%E8%AE%AE-BJM%20v3.2-1F2A44?style=flat-square"></a>
   <a href="references/methods.md"><img alt="工程模块 25 个" src="https://img.shields.io/badge/%E5%B7%A5%E7%A8%8B%E6%A8%A1%E5%9D%97-25%20%E4%B8%AA-1F2A44?style=flat-square"></a>
-  <a href="#可选的本地核验"><img alt="测试 BJM 36 项、图执行器 6 项" src="https://img.shields.io/badge/%E6%B5%8B%E8%AF%95-36%20%2B%206%20%E9%A1%B9-1F2A44?style=flat-square"></a>
+  <a href="#可选的本地核验"><img alt="测试 BJM 36 项、匿名对照材料 12 项、图执行器 8 项" src="https://img.shields.io/badge/%E6%B5%8B%E8%AF%95-36%20%2B%2012%20%2B%208%20%E9%A1%B9-1F2A44?style=flat-square"></a>
   <a href="graph-runtime/README.md"><img alt="图执行器需要 Python 3.10+" src="https://img.shields.io/badge/Python-3.10%2B-1F2A44?style=flat-square"></a>
   <a href="LICENSE"><img alt="许可 MIT" src="https://img.shields.io/badge/%E8%AE%B8%E5%8F%AF-MIT-1F2A44?style=flat-square"></a>
 </p>
 
 <p align="center">
-  <a href="https://github.com/rumpelpalmour757-lgtm/bjm-portable/releases/tag/v1.4.1"><img alt="下载完整包（v1.4.1）" src="https://img.shields.io/badge/%E4%B8%8B%E8%BD%BD%E5%AE%8C%E6%95%B4%E5%8C%85-23766A?style=for-the-badge"></a>
+  <a href="https://github.com/rumpelpalmour757-lgtm/bjm-portable/releases/tag/v1.5.1"><img alt="下载完整包（v1.5.1）" src="https://img.shields.io/badge/%E4%B8%8B%E8%BD%BD%E5%AE%8C%E6%95%B4%E5%8C%85-23766A?style=for-the-badge"></a>
   <a href="SKILL.md"><img alt="从入口文件 SKILL.md 开始" src="https://img.shields.io/badge/%E4%BB%8E%E5%85%A5%E5%8F%A3%E6%96%87%E4%BB%B6%E5%BC%80%E5%A7%8B-1F2A44?style=for-the-badge"></a>
 </p>
 
@@ -43,7 +43,7 @@
 
 BJM 通用迁移包是一套写给 AI 读的通用工作流程。BJM 是 Builder、Judge、Manager 三个角色的首字母：一个负责做，一个负责核对，一个负责决定下一步。它不限领域，软件、研究、文档、数据、运营和一般写作的任务都能用；中文小说的写作、续写、改稿和审稿用小说写作工坊（见下文）。主流程是：**明确交付和依据 → Builder 产出 → Judge 核对 → Manager 决定放行、重查、返修或停下 → 你决定采不采纳**。
 
-它是一组文件，不绑定某个项目。名字里的“迁移”，指的是整个目录可以原样带到新项目里用；`SKILL.md` 一页也可以单独交给 AI，直接当提示词用。带上整个目录，还能查完整协议、跑两个可选的 Python 脚本；不跑脚本，也能照 `SKILL.md` 用 BJM，脚本的用法见后文。BJM 不带模型，谁来做事取决于你用的那个 AI。
+它是一组文件，不绑定某个项目。名字里的“迁移”，指的是整个目录可以原样带到新项目里用；`SKILL.md` 一页也可以单独交给 AI，直接当提示词用。带上整个目录，还能查完整协议、跑可选的 Python 脚本：检查证据和版本的 `scripts/workflow.py`，准备匿名对照材料的 `scripts/blind_review.py`，以及图执行器。不跑脚本，也能照 `SKILL.md` 用 BJM，脚本的用法见后文。BJM 不带模型，谁来做事取决于你用的那个 AI。
 
 - **先认清这次要交什么** — 同一份材料，可能是要原样转格式、只审查、解释原因，也可能是修故障或改稿。BJM 先按你要的交付选定任务类型（共九类，从只解释、只审查到修复、改稿、发布），再按领域补上验收标准：软件、创作、研究、文档、数据、运营，也可以自定义领域。
 - **三个角色，各管一步** — Builder 交出成果和版本，写明假设和缺口。Judge 用原始要求、实际证据和当前成果逐项核对：机械检查记实际执行的结果，实质问题指出具体位置和影响。Manager 按事先定好的规则决定放行、重查、返修还是停下。普通任务由同一个 AI 自查，并标明是自查；任务要求独立审查时，交给看不到 Builder 做事过程的审查者，比如新开一个会话的 AI，或者人。
@@ -67,7 +67,7 @@ BJM 只在 AI 读到它时起作用：你把它交给 AI，或者装成技能以
 - **采纳和对外发送等你决定** — 审查通过、你的采纳和对外发送分开记录。AI 不替你说“已采纳”；没有你的授权，不对外发送或发布。
 - **`SKILL.md` 可以带到别的 AI 里用** — 一页就能当提示词用；能装技能的工具可以带上整个目录。脚本只用 Python 标准库。换到别的 AI 或工具里，它们实际照不照做，没有测过。
 
-以上是 BJM 要求 AI 做到的，不是效果保证。规则写进提示词，约束的是 AI 的做法；只有在你用的 AI 工具里实际接上并运行的程序检查，才能在程序上拦住（协议 §2.3、§11.3 也这样写）。`scripts/workflow.py` 只给出判断，本身不拦任何动作。AI 会不会每次照做，取决于你用的那个 AI 和工具。BJM 没有做过“用它和不用它”的效果对照：协议 §11.8 写了怎样在同一道题上对照两版方法，用它和不用它的对照可以照这个办法做，但还没有做过。包里的测试（BJM 36 项、图执行器 6 项）只说明两个脚本在测到的那些情形下照说明工作，不说明用了 BJM 交付就更好。
+以上是 BJM 要求 AI 做到的，不是效果保证。规则写进提示词，约束的是 AI 的做法；只有在你用的 AI 工具里实际接上并运行的程序检查，才能在程序上拦住（协议 §2.3、§11.3 也这样写）。`scripts/workflow.py` 只给出判断，本身不拦任何动作。AI 会不会每次照做，取决于你用的那个 AI 和工具。BJM 没有做过“用它和不用它”的效果对照：协议 §11.8 写了怎样在同一道题上对照两版方法，用它和不用它的对照可以照这个办法做，但还没有做过。v1.5 起包里多了准备匿名对照材料的脚本，对照本身仍然没有做过。包里的测试（BJM 36 项、匿名对照材料 12 项、图执行器 8 项）只说明这三个脚本在测到的那些情形下照说明工作，不说明用了 BJM 交付就更好。
 
 ## 它属于哪一类工程
 
@@ -103,6 +103,7 @@ BJM 和下面两个仓库是同一位作者的，三者各自独立，可以分�
 | [BJM v3.2 完整协议](references/bjm-v3.2.md) | 需要详细规则时查阅。§5 是验收，§9.7 是恢复，§11 是 AI 协作宪法，附录 A 是速查 |
 | [领域方法](references/methods.md) | 软件、创作、研究、文档、数据、运营和自定义领域 |
 | [脚本说明](references/runtime.md) | 需要检查证据、版本、返修次数或恢复状态时 |
+| [匿名对照材料](references/blind-review.md) | 需要比较两版方法的实际产出，并将版本身份与审查材料分开时 |
 | [图执行器 v0.1](graph-runtime/README.md) | 需要实际调度并行节点、保存执行状态和审批记录时 |
 
 ## 开始一个任务
@@ -131,9 +132,11 @@ python -m unittest discover -s tests -v
 
 示例会给出 `RECHECK`。来源换版后，需要重做保真审查，仍然有效的格式检查保留。真实任务按实际执行结果填证据。
 
-图执行器需要 Python 3.10 或更新版本，见[图执行器说明](graph-runtime/README.md)；`scripts/workflow.py` 没有写最低版本。v1.4.1 的两套测试（BJM 36 项、图执行器 6 项）这次在 Linux 上用 Python 3.11、3.12、3.13 各跑过一遍，都通过；Python 3.10、Windows 和 macOS 没有实测。
+要比较两版方法的实际产出时，可以用 `scripts/blind_review.py` 准备匿名对照材料，它同样只用 Python 标准库。命令、两个输出文件的规则和它查不到的线索见[匿名对照材料](references/blind-review.md)。
 
-图执行器有一个已知问题，这一版没有修：批准令牌是随机生成的，约有 1/64 的机会以“-”开头，这时命令行会把令牌当成选项，报错退出。按这个比例算，演示大约每 64 次碰上一次；图执行器的测试里有一项要批准两次，大约每 32 次碰上一次，重跑一般就能过。手动批准时写成 `approve approve -- '<令牌>'`，可以避开。
+图执行器需要 Python 3.10 或更新版本，见[图执行器说明](graph-runtime/README.md)；`scripts/workflow.py` 和 `scripts/blind_review.py` 没有写最低版本。v1.5.1 的测试这次在 Linux 上跑过：`tests/` 下 48 项（BJM 36 项、匿名对照材料 12 项）用 Python 3.9、3.11、3.12、3.13 各跑一遍，图执行器 8 项用 Python 3.11、3.12、3.13 各跑一遍，都通过；Python 3.10、Windows 和 macOS 没有实测。
+
+图执行器的批准令牌是随机生成的。v1.5.1 以前，令牌约有 1/64 的机会以“-”开头，命令行会把它当成选项，报错退出（以“-h”开头时多半只打出帮助，退出码为 0），都不会批准，演示和一项测试因此偶尔失败。v1.5.1 生成令牌时避开了“-”开头，演示这次在 Python 3.11、3.12、3.13 上一共连续跑了 300 次，都通过。用以前的版本建的数据库里，已经存下的以“-”开头的令牌不会自动更换，批准时写成 `approve approve -- '<令牌>'` 就行；[图执行器说明](graph-runtime/README.md)里的批准命令也都加了 `--`。
 
 ## 可选的图执行器
 
@@ -150,11 +153,12 @@ BJM 的 `scripts/workflow.py` 继续负责判断提交的证据和验收状态�
 - `vendor/agent-skills-0.6.16.zip` 是原始 ZIP，原样保留。展开目录保留全部普通文件，原包自带的一个符号链接保留在原始 ZIP 中。
 
 - 图执行器 v0.1 的源码、中文说明和测试在 `graph-runtime/`，从本目录运行 `python3 -B -m unittest discover -s graph-runtime/tests -v` 可复核。
+- 准备匿名对照材料的脚本是 `scripts/blind_review.py`，说明在 `references/blind-review.md`，测试在 `tests/test_blind_review.py`。
 
 整个目录可以独立迁移。自动发现技能或执行上游脚本时，按实际宿主配置和任务授权处理。
 
 ## 获取和许可
 
 - 克隆本仓库，或者从 [Releases](https://github.com/rumpelpalmour757-lgtm/bjm-portable/releases) 下载 `bjm-portable-<版本>.zip`；解压出来的 `bjm-portable/` 就是这个目录。
-- 作者：Celeste（GitHub：[rumpelpalmour757-lgtm](https://github.com/rumpelpalmour757-lgtm)）。开仓库时的整理和 v1.4.1 的修改由 Claude 按作者的决定完成。
+- 作者：Celeste（GitHub：[rumpelpalmour757-lgtm](https://github.com/rumpelpalmour757-lgtm)）。开仓库时的整理、v1.4.1 的修改和 v1.5.1 的合并与修改由 Claude 按作者的决定完成。v1.5 是 Claude 在本仓库之外做的一版，作者采纳后，v1.5.1 以它为参考合进了仓库。
 - 本仓库按 MIT 许可发布，版权人 Celeste，全文见 [LICENSE](LICENSE)。附带的 Agent Skills 按它自己的 MIT 许可（Copyright (c) 2025 Addy Osmani），见 [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md)。

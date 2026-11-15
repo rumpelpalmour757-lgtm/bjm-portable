@@ -37,12 +37,14 @@ python3 workflow.py --db "$bjm_demo_db" --run-id demo run --workers 2
 python3 workflow.py --db "$bjm_demo_db" --run-id demo status
 ```
 
-先运行下面第一条来核对旧令牌会被拒绝，再把第二条的占位符替换为新令牌并批准。
+先运行下面第一条来核对旧令牌会被拒绝，再把第二条的占位符替换为新令牌并批准。令牌前面的 `--` 告诉命令行后面不再是选项。
 
 ```bash
-python3 workflow.py --db "$bjm_demo_db" --run-id demo approve approve '<编辑前的令牌>'
-python3 workflow.py --db "$bjm_demo_db" --run-id demo approve approve '<编辑后的令牌>'
+python3 workflow.py --db "$bjm_demo_db" --run-id demo approve approve -- '<编辑前的令牌>'
+python3 workflow.py --db "$bjm_demo_db" --run-id demo approve approve -- '<编辑后的令牌>'
 ```
+
+令牌由程序随机生成。v1.5.1 以前的版本生成的令牌约有 1/64 的机会以 `-` 开头，不加 `--` 时命令行会把它当成选项，报错退出（以 `-h` 开头时多半只打出帮助，退出码为 0），都不会批准。旧数据库里已经存下的这种令牌不会自动更换，照上面的写法加上 `--` 就能批准。
 
 ## 运行回归测试
 

@@ -1,16 +1,22 @@
-from contextlib import contextmanager
+from contextlib import closing, contextmanager
+import importlib.util
 import json
 from pathlib import Path
+import sqlite3
 import subprocess
 import sys
 import tempfile
 import time
 import unittest
+from unittest.mock import patch
 
 
 PACKAGE = Path(__file__).resolve().parents[1]
 WORKFLOW = PACKAGE / "workflow.py"
 TWO_CHAPTERS = PACKAGE / "examples" / "two_chapters.json"
+SPEC = importlib.util.spec_from_file_location("bjm_graph_engine", PACKAGE / "engine.py")
+engine = importlib.util.module_from_spec(SPEC)
+SPEC.loader.exec_module(engine)
 
 
 class WorkflowCLITest(unittest.TestCase):
@@ -103,7 +109,7 @@ class WorkflowCLITest(unittest.TestCase):
         self.assertEqual(initial["approve"]["status"], "AWAITING_APPROVAL")
         old_token = initial["approve"]["token"]
         self.assertTrue(old_token)
-        accepted = self.cli("approve", "approve", old_token)["nodes"]
+        accepted = self.cli("approve", "approve", "--", old_token)["nodes"]
         self.assertEqual(accepted["approve"]["status"], "SUCCEEDED")
 
         edited = self.cli("edit", "draft-a", json.dumps({"text": "Revised chapter A."}))["nodes"]
@@ -127,11 +133,39 @@ class WorkflowCLITest(unittest.TestCase):
         new_token = rerun["approve"]["token"]
         self.assertTrue(new_token)
         self.assertNotEqual(new_token, old_token)
-        self.cli("approve", "approve", old_token, expected=2)
-        error = self.cli("approve", "approve", "旧审批令牌", expected=2)
+        stale = self.cli("approve", "approve", "--", old_token, expected=2)
+        self.assertIn("stale or invalid approval token", stale)
+        error = self.cli("approve", "approve", "--", "旧审批令牌", expected=2)
         self.assertNotIn("Traceback", error)
         self.assertEqual(self.cli("status")["nodes"]["approve"], rerun["approve"])
-        final = self.cli("approve", "approve", new_token)["nodes"]
+        final = self.cli("approve", "approve", "--", new_token)["nodes"]
+        self.assertEqual(final["approve"]["status"], "SUCCEEDED")
+
+    def test_approval_tokens_never_start_with_a_dash(self):
+        coordinator = engine.Engine(self.workspace / "tokens.db")
+        gate = {"id": "gate-0", "kind": "approval", "deps": [], "inputs": {}}
+        coordinator.init("pinned", {"version": "token-test", "nodes": [gate]})
+        generated = iter(["-first", "-second", "plain-token"])
+        with patch.object(engine.secrets, "token_urlsafe", side_effect=lambda size: next(generated)):
+            pinned = coordinator.run("pinned", handler=None)["nodes"]
+        self.assertEqual(pinned["gate-0"]["token"], "plain-token")
+
+        many = [{"id": f"gate-{index}", "kind": "approval", "deps": [], "inputs": {}} for index in range(640)]
+        coordinator.init("many", {"version": "token-test", "nodes": many})
+        tokens = [node["token"] for node in coordinator.run("many", handler=None)["nodes"].values()]
+        self.assertEqual(len(tokens), 640)
+        self.assertFalse([token for token in tokens if not token or token.startswith("-")])
+
+    def test_a_dash_token_saved_by_an_older_version_is_approved_after_double_dash(self):
+        self.cli("init", str(TWO_CHAPTERS))
+        token = self.cli("run")["nodes"]["approve"]["token"]
+        older = "-A" + token[2:]
+        with closing(sqlite3.connect(self.workspace / "workflow.db")) as db, db:
+            db.execute("UPDATE nodes SET token = ? WHERE run_id = ? AND id = ?", (older, "demo", "approve"))
+        error = self.cli("approve", "approve", older, expected=2)
+        self.assertIn("usage:", error)
+        self.assertEqual(self.cli("status")["nodes"]["approve"]["status"], "AWAITING_APPROVAL")
+        final = self.cli("approve", "approve", "--", older)["nodes"]
         self.assertEqual(final["approve"]["status"], "SUCCEEDED")
 
     def test_process_loss_requires_resolution_for_an_unsafe_action(self):

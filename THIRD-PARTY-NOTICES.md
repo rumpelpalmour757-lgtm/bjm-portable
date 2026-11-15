@@ -44,3 +44,4 @@ SOFTWARE.
 
 - `graph-runtime/README.md`“设计参考”一节列的 LangGraph、Temporal 和论文只是链接，仓库里没有它们的代码。
 - `references/bjm-v3.2.md` 开头的“方法来源”是一条公开讨论的链接。
+- `references/blind-review.md` 末尾链接了达尔文（[alchaincyf/darwin-skill](https://github.com/alchaincyf/darwin-skill)）v3.0.0 和 v3.0.1 的发布页。`scripts/blind_review.py` 参考了它成对盲评的做法和它发现的路径泄露问题，是另外写的，仓库里没有达尔文的代码或文本。

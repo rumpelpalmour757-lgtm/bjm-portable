@@ -43,12 +43,12 @@ def main():
         if not new_token or new_token == old_token:
             raise RuntimeError("new evidence did not invalidate the old approval")
         stale = subprocess.run(
-            command + ["approve", "approve", old_token],
+            command + ["approve", "approve", "--", old_token],
             capture_output=True, encoding="utf-8",
         )
-        if stale.returncode != 2:
+        if stale.returncode != 2 or "stale or invalid approval token" not in stale.stderr:
             raise RuntimeError("the old approval token was not rejected")
-        done = call("approve", "approve", new_token)["nodes"]
+        done = call("approve", "approve", "--", new_token)["nodes"]
         if done["approve"]["status"] != "SUCCEEDED":
             raise RuntimeError("the current approval did not complete")
         if done["review-a"]["attempt"] != failed["review-a"]["attempt"]:

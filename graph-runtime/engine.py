@@ -41,6 +41,14 @@ def _decode(value):
     return json.loads(value) if value is not None else None
 
 
+def _approval_token():
+    """Return a random approval token that a command line cannot mistake for an option."""
+    while True:
+        token = secrets.token_urlsafe(24)
+        if not token.startswith("-"):
+            return token
+
+
 def _validated_graph(graph):
     if not isinstance(graph, dict) or not isinstance(graph.get("version"), str) or not graph["version"].strip():
         raise ValueError("graph.version must be a nonempty string")
@@ -239,7 +247,7 @@ class Engine:
                         continue
                     fingerprint = self._fingerprint(run_id, version, row, spec, nodes)
                     if spec["kind"] == "approval":
-                        token = secrets.token_urlsafe(24)
+                        token = _approval_token()
                         self._update(db, run_id, node_id, status="AWAITING_APPROVAL", fingerprint=fingerprint, token=token)
                         self._event(db, run_id, node_id, "AWAITING_APPROVAL", fingerprint=fingerprint)
                         db.commit()
