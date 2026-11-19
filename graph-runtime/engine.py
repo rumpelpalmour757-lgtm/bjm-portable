@@ -43,10 +43,7 @@ def _decode(value):
 
 def _approval_token():
     """Return a random approval token that a command line cannot mistake for an option."""
-    while True:
-        token = secrets.token_urlsafe(24)
-        if not token.startswith("-"):
-            return token
+    return "bjm_" + secrets.token_urlsafe(24)
 
 
 def _validated_graph(graph):
@@ -66,11 +63,15 @@ def _validated_graph(graph):
         retry_safe = entry.get("retry_safe", False)
         if kind not in ("task", "approval") or not isinstance(retry_safe, bool):
             raise ValueError(f"invalid kind or retry_safe for {node_id}")
+        if "retry_on_interrupt" in entry and (kind != "task" or type(entry["retry_on_interrupt"]) is not bool):
+            raise ValueError(f"retry_on_interrupt must be a boolean on a task node: {node_id}")
         if not isinstance(deps, list) or not all(isinstance(dep, str) for dep in deps) or len(deps) != len(set(deps)):
             raise ValueError(f"deps must contain unique node IDs for {node_id}")
         if not isinstance(inputs, dict):
             raise ValueError(f"inputs must be an object for {node_id}")
         nodes[node_id] = dict(id=node_id, kind=kind, deps=deps, inputs=inputs, retry_safe=retry_safe)
+        if "retry_on_interrupt" in entry:
+            nodes[node_id]["retry_on_interrupt"] = entry["retry_on_interrupt"]
     if any(dep not in nodes for node in nodes.values() for dep in node["deps"]):
         raise ValueError("every dependency must name a declared node")
     try:
@@ -113,6 +114,14 @@ def _exclusive(lock_path):
             yield
         finally:
             release()
+
+
+class InputRejected(ValueError):
+    """The input must change and this attempt produced no external effects."""
+
+
+def _can_retry_interrupted(spec):
+    return spec["retry_safe"] and spec.get("retry_on_interrupt", True)
 
 
 class Engine:
@@ -185,10 +194,12 @@ class Engine:
         }
         return hashlib.sha256(_json(payload).encode()).hexdigest()
 
-    def init(self, run_id, graph):
+    def init(self, run_id, graph, *, check=None):
         if not isinstance(run_id, str) or not run_id.strip():
             raise ValueError("run_id must be a nonempty string")
         graph = _validated_graph(graph)
+        if check is not None:
+            check(graph["nodes"])
         encoded = _json(graph)
         with self._write() as db:
             existing = db.execute("SELECT graph FROM runs WHERE id = ?", (run_id,)).fetchone()
@@ -220,22 +231,31 @@ class Engine:
             rows = db.execute("SELECT * FROM events WHERE run_id = ? ORDER BY id", (run_id,))
             return [dict(row, details=_decode(row["details"])) for row in rows]
 
-    def _recover(self, db, run_id):
-        for node_id, row in self._nodes(db, run_id).items():
+    def _recover(self, db, run_id, nodes):
+        for node_id, row in nodes.items():
             if row["status"] != "RUNNING":
                 continue
-            safe = _decode(row["spec"])["retry_safe"]
+            safe = _can_retry_interrupted(_decode(row["spec"]))
             state = "PENDING" if safe else "UNCERTAIN"
             self._update(db, run_id, node_id, status=state, error="coordinator interrupted")
             self._event(db, run_id, node_id, "RECOVERED" if safe else "UNCERTAIN", attempt=row["attempt"])
         db.commit()
 
-    def run(self, run_id, handler, workers=2):
+    def run(self, run_id, handler, workers=2, *, preflight=None):
         if type(workers) is not int or workers < 1:
             raise ValueError("workers must be a positive integer")
         with self._write() as db, ThreadPoolExecutor(max_workers=workers) as pool:
             version = self._run_info(db, run_id)["version"]
-            self._recover(db, run_id)
+            nodes = self._nodes(db, run_id)
+            if preflight is not None:
+                runnable = []
+                for row in nodes.values():
+                    if row["status"] in ("PENDING", "RUNNING"):
+                        spec = _decode(row["spec"])
+                        if spec["kind"] == "task" and (row["status"] == "PENDING" or _can_retry_interrupted(spec)):
+                            runnable.append(spec)
+                preflight(runnable)
+            self._recover(db, run_id, nodes)
             futures = {}
             while True:
                 nodes = self._nodes(db, run_id)
@@ -245,13 +265,15 @@ class Engine:
                     spec = _decode(row["spec"])
                     if any(nodes[dep]["status"] != "SUCCEEDED" for dep in spec["deps"]):
                         continue
+                    if spec["kind"] == "task" and len(futures) >= workers:
+                        continue
                     fingerprint = self._fingerprint(run_id, version, row, spec, nodes)
                     if spec["kind"] == "approval":
                         token = _approval_token()
                         self._update(db, run_id, node_id, status="AWAITING_APPROVAL", fingerprint=fingerprint, token=token)
                         self._event(db, run_id, node_id, "AWAITING_APPROVAL", fingerprint=fingerprint)
                         db.commit()
-                    elif len(futures) < workers:
+                    else:
                         attempt = row["attempt"] + 1
                         self._update(db, run_id, node_id, status="RUNNING", attempt=attempt,
                                      fingerprint=fingerprint, error=None)
@@ -266,9 +288,14 @@ class Engine:
                     node_id, attempt, safe = futures.pop(future)
                     try:
                         output = _json(future.result())
+                        output.encode("utf-8")
                     except Exception as exc:
-                        state = "FAILED" if safe else "UNCERTAIN"
-                        error = type(exc).__name__
+                        if isinstance(exc, InputRejected):
+                            state = "REJECTED"
+                        else:
+                            state = "FAILED" if safe else "UNCERTAIN"
+                        # Adapters write InputRejected messages themselves, so they are kept to say what to fix.
+                        error = f"InputRejected: {exc}" if state == "REJECTED" else type(exc).__name__
                         self._update(db, run_id, node_id, status=state, error=error)
                         self._event(db, run_id, node_id, state, attempt=attempt, error=error)
                     else:
@@ -280,10 +307,11 @@ class Engine:
     def retry(self, run_id, node_id):
         with self._write() as db:
             row = self._node(self._nodes(db, run_id), node_id)
-            if row["status"] != "FAILED" or not _decode(row["spec"])["retry_safe"]:
-                raise ValueError("retry requires a failed, retry-safe node")
+            # A retry-safe node is UNCERTAIN only after an interruption with retry_on_interrupt false.
+            if row["status"] not in ("FAILED", "UNCERTAIN") or not _decode(row["spec"])["retry_safe"]:
+                raise ValueError("retry requires a failed or interrupted retry-safe node")
             self._update(db, run_id, node_id, status="PENDING", error=None)
-            self._event(db, run_id, node_id, "RETRY_REQUESTED", attempt=row["attempt"])
+            self._event(db, run_id, node_id, "RETRY_REQUESTED", attempt=row["attempt"], previous=row["status"])
         return self.status(run_id)
 
     def resolve(self, run_id, node_id, output):
@@ -329,7 +357,8 @@ class Engine:
                     affected.update(added)
                     remaining.difference_update(added)
                 if any(nodes[name]["status"] in ("RUNNING", "UNCERTAIN") for name in affected):
-                    raise ValueError("resolve in-flight or uncertain external work before editing affected nodes")
+                    raise ValueError("resolve in-flight or uncertain external work, or retry it if it is "
+                                     "retry-safe, before editing affected nodes")
                 for name in affected:
                     previous = _decode(nodes[name]["spec"])
                     if (nodes[name]["status"] == "SUCCEEDED" and previous["kind"] == "task"

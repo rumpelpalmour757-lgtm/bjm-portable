@@ -1,0 +1,39 @@
+{
+  "version": "claude-review-v1",
+  "nodes": [
+    {
+      "id": "draft",
+      "inputs": {
+        "text": "木门在阿岑面前合上。门里有人拖开椅子。阿岑盯着门缝看了一会儿。\n“里面几个？”阿栾问。\n“俩。胖的坐着，瘦的在数钱。”阿岑说。\n阿栾攥住了门把手。“那我现在就把门打开。”"
+      },
+      "retry_safe": true
+    },
+    {
+      "id": "review-dialogue",
+      "deps": ["draft"],
+      "inputs": {
+        "operation": "claude-review",
+        "model": "sonnet",
+        "focus": "检查对白是否自然、接话是否贴合当下行动。优先查是否有台词只是在预告马上发生的动作。"
+      },
+      "retry_safe": true,
+      "retry_on_interrupt": false
+    },
+    {
+      "id": "review-perception",
+      "deps": ["draft"],
+      "inputs": {
+        "operation": "claude-review",
+        "model": "haiku",
+        "focus": "检查人物感知边界。根据文中交代的视线和声音，指出阿岑能够或无法确认的细节。"
+      },
+      "retry_safe": true,
+      "retry_on_interrupt": false
+    },
+    {
+      "id": "approve",
+      "kind": "approval",
+      "deps": ["review-dialogue", "review-perception"]
+    }
+  ]
+}

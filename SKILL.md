@@ -53,3 +53,5 @@ python scripts/workflow.py evaluate checkpoint.json
 ```
 
 命令和输入格式见[运行说明](references/runtime.md)。脚本按已选意图给出建议，并核对提交的记录。实质审查以原文和证据为准，采纳由用户决定。只有本文件时，直接按上文执行和核对即可。交付用户要的成果，并说明会影响使用的缺口。
+
+需要用 Claude Code 跑独立审查，并保存分支结果和人工审批时，见[图执行器的 Claude Code 审查示例](graph-runtime/README.md#使用-claude-code-并行审稿)。启用 `run --claude` 前，按任务授权确定可以发送的候选和审查要求。BJM 只核对报告的格式和引句是否出自稿件；报告里没有结论，不等于稿件没有问题，批准前仍要看稿件本身。

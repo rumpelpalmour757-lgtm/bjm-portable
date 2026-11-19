@@ -26,6 +26,7 @@ class WorkflowCLITest(unittest.TestCase):
         self.workspace = Path(temporary.name)
         self.command = [
             sys.executable,
+            "-B",
             str(WORKFLOW),
             "--db",
             str(self.workspace / "workflow.db"),
@@ -131,7 +132,7 @@ class WorkflowCLITest(unittest.TestCase):
 
         self.assertEqual(rerun["approve"]["status"], "AWAITING_APPROVAL")
         new_token = rerun["approve"]["token"]
-        self.assertTrue(new_token)
+        self.assertTrue(new_token.startswith("bjm_"))
         self.assertNotEqual(new_token, old_token)
         stale = self.cli("approve", "approve", "--", old_token, expected=2)
         self.assertIn("stale or invalid approval token", stale)
@@ -145,16 +146,16 @@ class WorkflowCLITest(unittest.TestCase):
         coordinator = engine.Engine(self.workspace / "tokens.db")
         gate = {"id": "gate-0", "kind": "approval", "deps": [], "inputs": {}}
         coordinator.init("pinned", {"version": "token-test", "nodes": [gate]})
-        generated = iter(["-first", "-second", "plain-token"])
-        with patch.object(engine.secrets, "token_urlsafe", side_effect=lambda size: next(generated)):
+        with patch.object(engine.secrets, "token_urlsafe", return_value="-first"):
             pinned = coordinator.run("pinned", handler=None)["nodes"]
-        self.assertEqual(pinned["gate-0"]["token"], "plain-token")
+        self.assertEqual(pinned["gate-0"]["token"], "bjm_-first")
 
         many = [{"id": f"gate-{index}", "kind": "approval", "deps": [], "inputs": {}} for index in range(640)]
         coordinator.init("many", {"version": "token-test", "nodes": many})
         tokens = [node["token"] for node in coordinator.run("many", handler=None)["nodes"].values()]
         self.assertEqual(len(tokens), 640)
-        self.assertFalse([token for token in tokens if not token or token.startswith("-")])
+        self.assertEqual(len(set(tokens)), 640)
+        self.assertFalse([token for token in tokens if len(token) <= 4 or not token.startswith("bjm_")])
 
     def test_a_dash_token_saved_by_an_older_version_is_approved_after_double_dash(self):
         self.cli("init", str(TWO_CHAPTERS))
@@ -231,6 +232,83 @@ class WorkflowCLITest(unittest.TestCase):
         self.assertEqual(resumed["status"], "SUCCEEDED")
         self.assertEqual(resumed["attempt"], 2)
         self.assertEqual(resumed["output"]["text"], "Safe simulated step")
+
+    def test_interrupted_node_that_must_not_auto_retry_can_be_retried_by_hand(self):
+        graph = self.write_graph(
+            [
+                {"id": "draft", "inputs": {"text": "Chapter draft"}, "retry_safe": True},
+                {
+                    "id": "billed",
+                    "deps": ["draft"],
+                    "inputs": {"text": "Billed but repeatable step", "delay_seconds": 10},
+                    "retry_safe": True,
+                    "retry_on_interrupt": False,
+                },
+                {"id": "confirm", "kind": "approval", "deps": ["billed"], "inputs": {}},
+            ]
+        )
+        self.cli("init", graph)
+        with self.running_process("billed"):
+            pass
+
+        resumed = self.cli("run")["nodes"]
+        self.assertEqual(resumed["billed"]["status"], "UNCERTAIN")
+        self.assertEqual(resumed["billed"]["attempt"], 1)
+        self.assertEqual(self.cli("run")["nodes"], resumed)
+        self.cli("edit", "draft", json.dumps({"text": "Revised draft"}), expected=2)
+        self.cli("edit", "billed", json.dumps({"text": "Changed step"}), expected=2)
+
+        self.cli("retry", "billed")
+        retried = [event for event in self.cli("events") if event["event"] == "RETRY_REQUESTED"]
+        self.assertEqual(retried[-1]["details"], {"attempt": 1, "previous": "UNCERTAIN"})
+        self.cli("edit", "billed", json.dumps({"text": "Quick repeat"}))
+        final = self.cli("run")["nodes"]
+        self.assertEqual(final["billed"]["status"], "SUCCEEDED")
+        self.assertEqual(final["billed"]["attempt"], 2)
+        self.assertEqual(final["draft"], resumed["draft"])
+        self.assertEqual(final["confirm"]["status"], "AWAITING_APPROVAL")
+
+    def test_confirmed_input_rejection_requires_an_edit_before_resuming(self):
+        for retry_safe in (False, True):
+            with self.subTest(retry_safe=retry_safe):
+                self.command[-1] = f"reject-{retry_safe}"
+                graph = self.write_graph([
+                    {"id": "draft", "inputs": {"text": ""}, "retry_safe": retry_safe},
+                    {"id": "approve", "kind": "approval", "deps": ["draft"]},
+                    {"id": "unrelated", "inputs": {"text": "Keep this branch."}},
+                ])
+                self.cli("init", graph)
+                first = self.cli("run")["nodes"]
+                self.assertEqual(first["draft"]["status"], "REJECTED")
+                self.assertEqual(first["draft"]["error"], "InputRejected: demo draft requires nonempty text")
+                self.assertEqual(first["draft"]["attempt"], 1)
+                self.assertEqual(first["approve"]["status"], "PENDING")
+                self.assertEqual(first["unrelated"]["status"], "SUCCEEDED")
+                self.assertTrue(any(event["event"] == "REJECTED" and event["node_id"] == "draft"
+                                    for event in self.cli("events")))
+                self.cli("retry", "draft", expected=2)
+                self.cli("resolve", "draft", '{"text":"Unverified result"}', expected=2)
+                self.cli("edit", "draft", '{"text":""}')
+                self.assertEqual(self.cli("run")["nodes"], first)
+
+                self.cli("edit", "draft", '{"text":"Corrected input"}')
+                recovered = self.cli("run")["nodes"]
+                self.assertEqual(recovered["draft"]["status"], "SUCCEEDED")
+                self.assertEqual(recovered["draft"]["attempt"], 2)
+                self.assertEqual(recovered["draft"]["output"]["text"], "Corrected input")
+                self.assertEqual(recovered["unrelated"], first["unrelated"])
+                self.assertEqual(recovered["approve"]["status"], "AWAITING_APPROVAL")
+
+    def test_unconfirmed_adapter_exception_still_requires_resolution(self):
+        graph = self.write_graph([
+            {"id": "action", "inputs": {"text": "Action with an unknown outcome"}},
+        ])
+        self.cli("init", graph)
+        state = self.cli("run", "--fail-before", "action")["nodes"]["action"]
+        self.assertEqual(state["status"], "UNCERTAIN")
+        self.assertEqual(state["error"], "TimeoutError")
+        self.cli("edit", "action", '{"text":"Different input"}', expected=2)
+        self.cli("retry", "action", expected=2)
 
     def test_active_runner_excludes_a_second_process(self):
         graph = self.write_graph(

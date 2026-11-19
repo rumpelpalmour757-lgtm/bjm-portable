@@ -44,4 +44,6 @@ SOFTWARE.
 
 - `graph-runtime/README.md`“设计参考”一节列的 LangGraph、Temporal 和论文只是链接，仓库里没有它们的代码。
 - `references/bjm-v3.2.md` 开头的“方法来源”是一条公开讨论的链接。
-- `references/blind-review.md` 末尾链接了达尔文（[alchaincyf/darwin-skill](https://github.com/alchaincyf/darwin-skill)）v3.0.0 和 v3.0.1 的发布页。`scripts/blind_review.py` 参考了它成对盲评的做法和它发现的路径泄露问题，是另外写的，仓库里没有达尔文的代码或文本。
+- `references/blind-review.md` 末尾链接了达尔文（[alchaincyf/darwin-skill](https://github.com/alchaincyf/darwin-skill)）v3.0.0、v3.0.1 和 v3.0.2 的发布页。`scripts/blind_review.py` 参考了它成对盲评的做法和它发现的路径泄露问题；`scripts/check_review_votes.py`（v1.7 起）参考了 v3.0.2 一次列出缺票、只向没交有效票的评委补收的做法。两个脚本都是另外写的（收票脚本照 v1.7 的版本记录是 BJM 自己实现的，这次没有联网和达尔文的代码逐行对照），仓库里没有达尔文的代码或文本。
+- `CHANGELOG.md` 的 v1.6 和 v1.7 两节链接了 [Temporal Google GenAI 1.0.0](https://github.com/temporalio/ai-integrations/releases/tag/python/google_genai/v1.0.0) 和 [OpenAI Agents SDK v0.25.0](https://github.com/openai/openai-agents-python/releases/tag/v0.25.0) 的发布页。图执行器参考了前者把必须改输入的错误和可以重试的故障分开、后者减少重复计算输入指纹的思路。照这两节的记录，代码是按 BJM 自己的调度器另外写的；相关改动只有几行（`engine.py` 的 `InputRejected` 和派发前才算指纹），这次没有联网和上游逐行对照，仓库里没有它们的代码。
+- `graph-runtime/README.md` 和 `CHANGELOG.md` 链接了 Claude Code 的文档（子代理、命令行参数、非交互运行）。Claude Code 是使用者在本机另外安装的程序，包里不带；`graph-runtime/claude_review.py` 只在使用者运行 `run --claude` 时把它当作外部命令启动，没有拷贝它的代码或文档。

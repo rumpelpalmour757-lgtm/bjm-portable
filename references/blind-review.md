@@ -37,4 +37,33 @@ python3 scripts/blind_review.py baseline.txt candidate.txt \
 - 两份产出的换行符（CRLF 或 LF）、开头的 BOM 或末尾换行的个数不一致时，脚本照常生成材料，不改原文，只在标准错误里提示一句；标准错误已关闭或写不进去时不提示，材料和退出码不受影响。审查者能看到这些差异，它们可能暴露是哪一版流水线的产出，要不要先统一格式另做副本，由准备材料的人决定。
 - 交给审查者之前，人工检查剩下的线索，例如措辞、附件元数据和没有登记的路径。附件和非文本内容需要另行准备。脚本只做材料隔离，实际评分、硬约束验收和采纳继续按 BJM 记录。
 
-参考了[达尔文 v3.0.0 的实跑盲评](https://github.com/alchaincyf/darwin-skill/releases/tag/v3.0.0)和 [v3.0.1 的路径泄露修复](https://github.com/alchaincyf/darwin-skill/releases/tag/v3.0.1)。达尔文的做法是把材料里的相对路径改写掉；BJM 是独立实现，保留原文，命中已知标记时停止准备。
+## 核对已收选票
+
+每道题发出前，由主持人保存一份 UTF-8 名单，例如 `roster.json`。下例的 `实际摘要` 从对应审查者的映射文件中复制。选票路径相对于名单所在目录，每位审查者使用一个路径。
+
+```json
+{
+  "reviewers": {
+    "judge-01": {
+      "packet_sha256": "实际摘要",
+      "vote_file": "votes/judge-01.json"
+    }
+  }
+}
+```
+
+把独立审查者对 A、B 或平局的结论保存为 UTF-8 JSON，开头带不带 BOM 都可以。`choice` 只能写 `"A"`、`"B"` 或 `"tie"`（平局写 `tie`，区分大小写），写成 `"平局"` 或小写的 `"a"` 都算坏票。收集时按实际收件来源记录 `reviewer` 和已发送材料的 `packet_sha256`，不让审查者自行猜摘要。版本映射由主持人保管。
+
+```json
+{"reviewer": "judge-01", "packet_sha256": "实际摘要", "choice": "tie"}
+```
+
+```bash
+python3 scripts/check_review_votes.py roster.json
+```
+
+`accepted` 列出符合名单、材料摘要和格式的票。保留这些原票，只处理 `needs_ballot` 列出的审查者及原因。先核实已有回执能否补齐，对确实缺失的票再向对应审查者补收，沿用这一轮的原材料。退出码为 0 表示全齐，1 表示待补，2 表示名单本身不可用。脚本只读名单和选票，实际评分、硬约束验收和采纳仍按 BJM 记录。留出题沿用事先冻结的标准和产出，已经有效的票不以换人或重跑的方式替换。
+
+`needs_ballot` 里的原因有六种：`missing` 是没有这个文件；`unreadable` 是文件读不了，例如路径是个目录；`invalid_json` 是内容不是有效的 JSON，包括有重复的键、不是 UTF-8 和嵌套过深；`invalid_ballot` 是选票不是 JSON 对象，或者 `choice` 不是上面三个值之一；`reviewer_mismatch` 是 `reviewer` 和名单里的名字不符；`packet_mismatch` 是 `packet_sha256` 和名单里的摘要不符。
+
+参考了[达尔文 v3.0.0 的实跑盲评](https://github.com/alchaincyf/darwin-skill/releases/tag/v3.0.0)、[v3.0.1 的路径泄露修复](https://github.com/alchaincyf/darwin-skill/releases/tag/v3.0.1)和 [v3.0.2](https://github.com/alchaincyf/darwin-skill/releases/tag/v3.0.2) 的缺票汇总、只补未交票评委。达尔文的做法是把材料里的相对路径改写掉；BJM 是独立实现，保留原文，命中已知标记时停止准备，收票时把选票绑定到 BJM 自己的材料摘要。
