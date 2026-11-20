@@ -194,6 +194,52 @@ class Engine:
         }
         return hashlib.sha256(_json(payload).encode()).hexdigest()
 
+    @staticmethod
+    def _approval_content(spec, nodes):
+        """Digest what a reviewer sees: the approval's own inputs and its dependencies' outputs.
+
+        Unlike the fingerprint it leaves out revisions, so the same content keeps the same digest
+        after edits that change something and then change it back.
+        """
+        payload = {"inputs": spec["inputs"], "deps": {dep: nodes[dep]["output"] for dep in spec["deps"]}}
+        return hashlib.sha256(_json(payload).encode()).hexdigest()
+
+    @staticmethod
+    def _rejected_revision(db, run_id, node_id, content):
+        """Return the revision at which a reviewer rejected this exact content, or None."""
+        rows = db.execute("SELECT details FROM events WHERE run_id = ? AND node_id = ? AND event = ? ORDER BY id",
+                          (run_id, node_id, "APPROVAL_REJECTED"))
+        for row in rows:
+            details = _decode(row["details"])
+            if isinstance(details, dict) and details.get("content_sha256") == content:
+                return details.get("revision")
+        return None
+
+    @staticmethod
+    def _queued(nodes):
+        """Task specs still to run, in database order: pending, or interrupted and safe to start again."""
+        queued = []
+        for row in nodes.values():
+            spec = _decode(row["spec"])
+            if spec["kind"] == "task" and (row["status"] == "PENDING" or (
+                    row["status"] == "RUNNING" and _can_retry_interrupted(spec))):
+                queued.append(spec)
+        return queued
+
+    @staticmethod
+    def _runnable(nodes, queued):
+        """The queued tasks this run can start.
+
+        A task behind an approval, or behind a node that stays failed, uncertain or rejected for the
+        whole run, cannot start in this run and is left out.
+        """
+        deps = {spec["id"]: spec["deps"] for spec in queued}
+        runnable = set()
+        for name in TopologicalSorter(deps).static_order():
+            if name in deps and all(nodes[dep]["status"] == "SUCCEEDED" or dep in runnable for dep in deps[name]):
+                runnable.add(name)
+        return [spec for spec in queued if spec["id"] in runnable]
+
     def init(self, run_id, graph, *, check=None):
         if not isinstance(run_id, str) or not run_id.strip():
             raise ValueError("run_id must be a nonempty string")
@@ -248,13 +294,8 @@ class Engine:
             version = self._run_info(db, run_id)["version"]
             nodes = self._nodes(db, run_id)
             if preflight is not None:
-                runnable = []
-                for row in nodes.values():
-                    if row["status"] in ("PENDING", "RUNNING"):
-                        spec = _decode(row["spec"])
-                        if spec["kind"] == "task" and (row["status"] == "PENDING" or _can_retry_interrupted(spec)):
-                            runnable.append(spec)
-                preflight(runnable)
+                queued = self._queued(nodes)
+                preflight(queued, self._runnable(nodes, queued))
             self._recover(db, run_id, nodes)
             futures = {}
             while True:
@@ -269,9 +310,21 @@ class Engine:
                         continue
                     fingerprint = self._fingerprint(run_id, version, row, spec, nodes)
                     if spec["kind"] == "approval":
-                        token = _approval_token()
-                        self._update(db, run_id, node_id, status="AWAITING_APPROVAL", fingerprint=fingerprint, token=token)
-                        self._event(db, run_id, node_id, "AWAITING_APPROVAL", fingerprint=fingerprint)
+                        content = self._approval_content(spec, nodes)
+                        rejected_at = self._rejected_revision(db, run_id, node_id, content)
+                        if rejected_at is not None:
+                            # A reviewer already turned this exact content down; do not ask again.
+                            error = f"ApprovalRejected: the same content was rejected at revision {rejected_at}"
+                            self._update(db, run_id, node_id, status="REJECTED", fingerprint=fingerprint,
+                                         token=None, error=error)
+                            self._event(db, run_id, node_id, "REJECTION_KEPT", fingerprint=fingerprint,
+                                        revision=row["revision"], content_sha256=content,
+                                        rejected_revision=rejected_at)
+                        else:
+                            token = _approval_token()
+                            self._update(db, run_id, node_id, status="AWAITING_APPROVAL", fingerprint=fingerprint,
+                                         token=token)
+                            self._event(db, run_id, node_id, "AWAITING_APPROVAL", fingerprint=fingerprint)
                         db.commit()
                     else:
                         attempt = row["attempt"] + 1
@@ -325,19 +378,46 @@ class Engine:
         return self.status(run_id)
 
     def approve(self, run_id, node_id, token):
+        return self._decide_approval(run_id, node_id, token, approved=True)
+
+    def reject(self, run_id, node_id, token):
+        return self._decide_approval(run_id, node_id, token, approved=False)
+
+    def _decide_approval(self, run_id, node_id, token, *, approved):
         with self._write() as db:
             version = self._run_info(db, run_id)["version"]
             nodes = self._nodes(db, run_id)
             row = self._node(nodes, node_id)
             spec = _decode(row["spec"])
-            if (row["status"] != "AWAITING_APPROVAL" or not isinstance(token, str)
+            # Name the state first, so an operator is not sent looking for a mistyped token.
+            if spec["kind"] != "approval":
+                raise ValueError(f"{node_id} is not an approval node")
+            if row["status"] == "REJECTED":
+                raise ValueError(f"{node_id} was rejected; revise what it approves, then run again for a new token")
+            if row["status"] == "SUCCEEDED":
+                raise ValueError(f"{node_id} is already approved")
+            if row["status"] != "AWAITING_APPROVAL":
+                raise ValueError(f"{node_id} is not awaiting a decision; run the workflow until it issues a token")
+            if (not isinstance(row["token"], str) or not isinstance(token, str)
                     or not hmac.compare_digest(row["token"].encode(), token.encode())
                     or any(nodes[dep]["status"] != "SUCCEEDED" for dep in spec["deps"])
                     or row["fingerprint"] != self._fingerprint(run_id, version, row, spec, nodes)):
                 raise ValueError("stale or invalid approval token")
-            output = _json({"approved": True, "fingerprint": row["fingerprint"]})
-            self._update(db, run_id, node_id, status="SUCCEEDED", token=None, output=output)
-            self._event(db, run_id, node_id, "APPROVED", fingerprint=row["fingerprint"])
+            content = self._approval_content(spec, nodes)
+            if approved:
+                # run issues no token for rejected content, but an older version may have issued this one.
+                rejected_at = self._rejected_revision(db, run_id, node_id, content)
+                if rejected_at is not None:
+                    raise ValueError(f"{node_id}: the same content was rejected at revision {rejected_at}; "
+                                     "revise what it approves, then run again for a new token")
+                output = _json({"approved": True, "fingerprint": row["fingerprint"]})
+                self._update(db, run_id, node_id, status="SUCCEEDED", token=None, output=output)
+                self._event(db, run_id, node_id, "APPROVED", fingerprint=row["fingerprint"])
+            else:
+                self._update(db, run_id, node_id, status="REJECTED", token=None, output=None,
+                             error="ApprovalRejected")
+                self._event(db, run_id, node_id, "APPROVAL_REJECTED", fingerprint=row["fingerprint"],
+                            revision=row["revision"], content_sha256=content)
         return self.status(run_id)
 
     def edit(self, run_id, node_id, inputs):

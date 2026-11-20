@@ -254,6 +254,23 @@ class ClaudeReviewCLITest(unittest.TestCase):
         self.assertEqual(final["review-b"]["attempt"], 3)
         self.assertEqual(final["approve"]["status"], "AWAITING_APPROVAL")
 
+    def test_an_interrupted_review_that_restarts_on_its_own_needs_claude(self):
+        self.initialize()
+        self.cli("run", "--claude")
+        # review-a may restart after an interruption; model a coordinator lost while it ran.
+        with closing(sqlite3.connect(self.workspace / "graph.sqlite")) as database, database:
+            database.execute("UPDATE nodes SET status = 'RUNNING', attempt = attempt + 1 WHERE id = 'review-a'")
+        interrupted = self.cli("status")
+        self.assertIn("Claude review nodes require run --claude", self.cli("run", expected=2))
+        self.assertEqual(self.cli("status"), interrupted)
+        self.assertEqual(len(self.call_log()), 2)
+
+        resumed = self.cli("run", "--claude")["nodes"]["review-a"]
+        self.assertEqual(resumed["status"], "SUCCEEDED")
+        self.assertEqual(resumed["attempt"], 3)
+        self.assertCountEqual([call["task"]["focus"] for call in self.call_log()],
+                              ["dialogue", "continuity", "dialogue"])
+
     def test_empty_report_on_a_draft_with_embedded_instructions_only_awaits_approval(self):
         nodes = [
             {"id": "draft", "inputs": {"text": INJECTED_DRAFT}, "retry_safe": True},

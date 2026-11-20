@@ -2,6 +2,45 @@
 
 日期按台北时间（UTC+8）记。
 
+## v1.9.1
+
+2026-11-20。在本仓库 v1.8.1 上合入作者交来的 v1.9 新加的两样：图执行器退回审批的 `reject` 和 Agent Skills 0.6.17，再按复核改了几处；在本仓库里，上一版是 v1.8.1。v1.9 是作者在自己的 v1.8 上做的，不含本仓库 v1.8.1 的修改，所以这一版以 v1.8.1 为底，只把 v1.9 相对 v1.8 的改动移过来，版本号接着本仓库的 v1.8.1 记作 v1.9.1。协议的规则、`SKILL.md`、`scripts/`、`tests/`、检查点格式和图执行器的数据库结构与 v1.8.1 相同；协议只改了附录 C“改编依据”里的一句说明。
+
+- 合并：v1.9 相对 v1.8 改了 `CHANGELOG.md`、`README.md`、`graph-runtime/README.md`、`graph-runtime/engine.py`、`graph-runtime/workflow.py`、`graph-runtime/tests/test_cli.py` 和 `references/methods.md`，并把 `vendor/` 换成 Agent Skills 0.6.17。`engine.py` 和 `workflow.py` 里的 `reject`、`test_cli.py` 里的两项新测试移到本仓库的图执行器上，v1.8.1 对 `retry`、`init`、`run` 的修正都保留；两边改的地方不重叠，三方合并没有文本冲突。`graph-runtime/README.md` 以仓库为底，接上 v1.9 的“退回当前版本”一节、联审表里的一行和设计参考里的一条，再按下面几条改。`references/methods.md` 取 v1.9 的，它等于把仓库版里的 0.6.16 全部换成 0.6.17，再在“设计、实现或检查界面”下面加一行无障碍审查。`README.md` 和本文件以仓库为底：v1.9 的 `README.md` 是作者那条线上的短版本，只改了版本号和组件说明；这一版照实改了封面的版本、模块数和测试数徽章、下载按钮、两处介绍里的模块数（第一处的覆盖范围加了无障碍审查）、正文里的测试数、入口表、测试说明、令牌一句的版本（“本版起”改成“v1.8.1 起”）、“可选的图执行器”一段的 `reject` 和 `--claude` 规则、包内组件和署名。v1.9 自带的版本记录原文照录在下面。
+- Agent Skills 0.6.17：删掉 `vendor/agent-skills-0.6.16/` 和 `vendor/agent-skills-0.6.16.zip`，换成 `vendor/agent-skills-0.6.17/` 和 `vendor/agent-skills-0.6.17.zip`。ZIP 取自作者的 v1.9 包，和 GitHub 上 0.6.17 标签的官方源码 ZIP 逐字节相同，SHA-256 为 `f2d2dfca1ed15b78364623c6d303c626a0518184136520644ec7b15d4ba3aeb0`，ZIP 注释记的提交是 `8c99fa36d90068c82d547f7c12a9d67a3e95f4ee`，ZIP 里记的时间是 2026-11-18 20:06:37（UTC），即台北时间 2026-11-19 04:06。发布页显示 0.6.17 指向提交 8c99fa3，标着最新版。和 0.6.16 比，模块从 25 个变成 26 个：新加 `accessibility-engineering`（审查现有界面的无障碍问题），`ci-cd-and-automation`、`code-review-and-quality`、`spec-driven-development`、`using-agent-skills` 四个模块的 `SKILL.md` 改过，没有删掉的模块；文件新增 10 个、改了 28 个、删除 0 个。`LICENSE` 和 0.6.16 的逐字节相同，仍是 MIT，版权行仍是 Copyright (c) 2025 Addy Osmani。
+- 展开目录照 0.6.16 的规矩办：261 个普通文件和 ZIP 逐字节相同，原包的符号链接 `.opencode/skills` 只留在 ZIP 里；ZIP 里标成可执行的 9 个 shell 脚本保留可执行位（v1.9 包里这 9 个都记成了不可执行），比 0.6.16 多的一个是新模块的 `skills/accessibility-engineering/scripts/audit-a11y.sh`。这个脚本会用 `npx --yes` 从网上取 `@axe-core/cli@4.13.0` 和 `pa11y@9.1.1` 并执行；这次只读过，`vendor/` 下的脚本一律没有运行。
+- 跟着 0.6.17 改的说明：`README.md` 的模块数和路径、`references/methods.md` 的模块表、`THIRD-PARTY-NOTICES.md` 的版本、三处路径、SHA-256、提交和可执行脚本的数目。`references/bjm-v3.2.md` 附录 C“改编依据”那句说明改成 0.6.17：表里引的 12 个上游路径在 0.6.17 里都还在，0.6.17 又改了其中 4 个（`using-agent-skills`、`spec-driven-development`、`code-review-and-quality` 三个模块的 `SKILL.md` 和 `evals/README.md`），协议正文没有据此改写；原句列了五个模块却写成“四个模块”，一并改正。旧版本各节和 `docs/releases/` 里写 0.6.16、25 个模块的地方是历史记录，没有改。
+- 退回审批（来自 v1.9）：审批节点等待批准时，`reject <节点> -- <令牌>` 退回当前版本。节点记为 `REJECTED`，`error` 为 `ApprovalRejected`，令牌作废，写一条 `APPROVAL_REJECTED` 事件；依赖它的步骤一直等着，无关分支照常走；被退回的节点不接受 `approve`、`reject`、`retry` 和 `resolve`；改了上游稿件再 `run`，才发新令牌。`reject` 和 `approve` 用同一套核对。
+- 按复核改的地方：
+  - 退回按内容记：v1.9 只靠指纹认版本，而指纹里含修订号，所以把上游改成别的再改回原文，或者往上游加一个不影响输出的输入，都会对同一份、已经退回过的内容重新发令牌，`status` 里也看不出来。现在 `APPROVAL_REJECTED` 事件多记一项 `content_sha256`，是审批节点自己的 `inputs` 加各依赖输出的摘要，不含修订号；`run` 发令牌之前先和这个节点以前的退回对照，内容相同就保持 `REJECTED`、不发令牌，写一条 `REJECTION_KEPT` 事件，`error` 写明是在哪个修订号退回的。审阅者要重看同一份稿件时，改审批节点自己的 `inputs` 再 `run`，这会重开审批，`graph-runtime/README.md` 写明了这是有意留的做法。退回只在同一个运行里、同一个审批节点上对照；作者 v1.9 记下的退回没有 `content_sha256`，不参与对照。这种对照只在依赖节点的输出逐字节相同时起作用：审批排在 Claude Code 审查节点后面时（`examples/claude_review.json` 就是这样），上游一改，审查就重跑，每次的会话 ID 不同；排在另一个审批后面时，前一个审批的输出里有带修订号的指纹。这两种图里同一份稿件仍会再次送审，要靠审阅者自己核对，`graph-runtime/README.md` 写明了这一点；要在代码上解决，得为审查节点另定送审内容，留到以后。`approve` 在令牌核对通过以后也和以前的退回对照，内容相同就拒绝批准，库里什么也不写；只做 v1.9.1 的流程里不会遇到，因为发令牌前已经查过，这一道是给经过旧版本的库用的，见下面“回退和兼容”。
+  - 批准和退回被拒时分开报错：节点已经批准、已经退回、还没发令牌或者不是审批节点时，报错写明是哪一种；只有令牌不对或过期，才报 `stale or invalid approval token`。退出码仍是 2，库里什么也不写。`approve` 也照这样报。
+  - `run` 的预检分成两步。审查节点的声明照 v1.8.1 那样核对：所有还没跑的审查节点（`PENDING`，以及中断后能自动重跑的 `RUNNING`）都查，这次轮不到的也查，不合格就在任何分支开跑以前报错。要不要 `--claude`、找不找 `claude` 程序，只看这次能轮到的任务节点：排在等待批准或被退回的审批后面、或者排在停在 `FAILED`、`UNCERTAIN`、`REJECTED` 的节点后面的任务不算。以前 Claude Code 审查节点挂在被退回的审批后面时，不加 `--claude` 的 `run` 整体报错，无关分支也走不了；审批还在等待时也是这样，不是 v1.9 带来的。审查节点真的轮到时，仍要 `run --claude`。`workflow.py` 另加一道保险：没经过预检的审查节点不启动任何程序。
+  - 图执行器改称 v0.1.5。v1.9 包把“v1.8 的 v0.1.3 加上 `reject`”叫作 v0.1.4，而本仓库 v1.8.1 已经把改了 `retry`、`init` 和 `run` 检查的那一版叫作 v0.1.4；这一版是两者合起来再加上面几处，不再沿用同一个版本号。下面 v1.9 一节原文里的“图执行器 v0.1.4”指 v1.9 包里的那一版。
+  - 测试：v1.9 新加的两项移过来，令牌前一律加 `--`，和仓库其他测试一致；改数据库的连接用 `closing()` 关上，v1.9 的写法在 `python3 -X dev` 下报 `ResourceWarning: unclosed database`；退回事件的断言加上 `content_sha256`。另加八项：退回按内容记；几种拒绝各自的报错和事件不变；预检跳过这次轮不到的审查节点（审批在等待和被退回时都试）；退回只管做出退回的那个审批节点；新建的运行不沿用以前运行里的退回；`approve` 拒绝已经退回过的同一份内容；挂在审批后面、声明被改坏的审查节点在第一次 `run` 时就报错；中断后能自动重跑的审查节点仍要 `run --claude`，加了就真的调用。其中六项和改过断言的那一项，放在只做了三方合并、没按复核改的代码上跑都失败；另外两项（新建的运行、中断后的审查节点）在那份代码上本来就成立。复核时试出四种错误改法，原有的 28 项都看不出：查退回时不按运行过滤、不按节点过滤、预检漏掉中断后能自动重跑的节点、把等待批准的审批当成已经通过；现在每一种都有测试失败。
+  - 说明文字：`graph-runtime/README.md` 的“退回当前版本”一节改写成第二条批准命令的另一种做法。v1.9 的写法接在已经用新令牌批准以后，照着做只会报令牌无效；现在还注明命令里的 `approve` 是演示图里审批节点的 ID。这一节另外写明了送审内容怎样算、哪些做法什么都不变、哪些会记 `REJECTION_KEPT`、审批排在审查节点或另一个审批后面时同一份稿件仍会再次送审、该改上游稿件而不是审批节点自己的 `inputs`、要重看同一份稿件怎么办、经过旧版本的库里的令牌怎样处理、图执行器不记退回理由。“看懂两章联审”表里输入被拒那一行写明是任务节点，`error` 以 `InputRejected` 开头，并注明 v1.8.1 以前的版本和作者的 v1.9 写的库里只有类名，没有冒号和原因；“接到实际任务时”里“命令沿用原版”的说法改成命令新增了 `reject`，并写明 `REJECTED` 有两种来源、按 `error` 区分。`THIRD-PARTY-NOTICES.md` 写明 OpenAI Agents SDK v0.25.0 和 Temporal OSCAR 只作参考。新加 `docs/releases/v1.9.1.md`。
+- 测试：`tests/` 下 53 项（BJM 36 项、匿名对照材料 12 项、收票 5 项），`graph-runtime/tests/` 下 33 项（v1.8.1 的 23 项、v1.9 的 2 项、这一版新加的 8 项）。实测结果见 `docs/releases/v1.9.1.md`。
+- 回退和兼容：图执行器的数据库结构没有变，`user_version` 仍是 1。v1.8.1 建的库交给 v1.9.1，能直接续跑，对 v1.8.1 发的令牌也能 `reject`，改稿后再批准、走完下游。v1.9.1 写了退回的库交给 v1.8.1：依赖被退回节点的步骤照样等着；`approve`、`retry`、`resolve` 都不接受；v1.8.1 没有 `reject` 命令，命令行报用法错误；v1.8.1 不看 `content_sha256` 和 `REJECTION_KEPT`，改了上游以后再 `run` 就发新令牌，内容和退回时相同也一样；v1.8.1 的说明把 `REJECTED` 只说成输入被拒、让人改这个节点的输入，对被退回的审批节点照做会把原稿重新送审，要改的是上游稿件。v1.8.1 这样对同一份内容发的令牌，库回到 v1.9.1 以后不能用来批准：`approve` 报这份内容在哪个修订号退回过，库里什么也不写，`reject` 照常可以用；在 v1.8.1 里已经批准了的，v1.9.1 不会改回去。作者的 v1.8 和 v1.9 也不按内容对照，经过它们的库回到 v1.9.1 时一样。作者 v1.9 的库交给 v1.9.1 也能续跑；v1.9.1 的库交给 v1.9，被退回的节点照样拦住下游。
+
+下面 v1.9 一节是作者交来的 v1.9 包自带的版本记录，原文照录。v1.9 是在作者自己的 v1.8 上做的，没有单独发布到本仓库；本仓库从 v1.8.1 直接到 v1.9.1。
+
+## v1.9
+
+2026-11-20。基于 v1.8，组件为 BJM v3.2、Agent Skills 0.6.17 和图执行器 v0.1.4。
+
+- 更新至 [Agent Skills 0.6.17 正式版](https://github.com/addyosmani/agent-skills/releases/tag/0.6.17)（2026-11-19 台北时间，[提交 8c99fa36d90068c82d547f7c12a9d67a3e95f4ee](https://github.com/addyosmani/agent-skills/commit/8c99fa36d90068c82d547f7c12a9d67a3e95f4ee)）。新增无障碍审查模块，更新 CI 回滚、代码审查、规格组织、模块索引和共享资料。26 个模块及 MIT 许可随包提供。官方标签源码 ZIP 的 SHA-256 为 `f2d2dfca1ed15b78364623c6d303c626a0518184136520644ec7b15d4ba3aeb0`。
+- 图执行器新增 `reject`。拒绝绑定当前审批令牌、输入指纹和修订号，写入 SQLite 事件并拦住依赖节点。无关分支可继续。修订输入后生成新审批令牌。v1.8 遇到人工拒绝时只能继续等待或修改输入。参考 [OpenAI Agents SDK v0.25.0](https://github.com/openai/openai-agents-python/releases/tag/v0.25.0)和 [Temporal 的 OSCAR 案例](https://temporal.io/blog/building-a-reliable-ai-agent-with-oscar)，日期均为 2026-11-18。
+- 查阅达尔文 [v3.0.2 正式版](https://github.com/alchaincyf/darwin-skill/releases/tag/v3.0.2)（2026-11-18，[提交 5a8e633a20ea5bb2bf8b9c697c6da04ad85740ba](https://github.com/alchaincyf/darwin-skill/commit/5a8e633a20ea5bb2bf8b9c697c6da04ad85740ba)，[MIT 许可](https://github.com/alchaincyf/darwin-skill/blob/v3.0.2/LICENSE)）。采用记录见 v1.7。该版按裁决影响选择重跑的做法依赖自动计票裁决，当前 BJM 继续使用人工采纳。
+- 验收覆盖 46 项 BJM 测试、17 项图执行器测试、模拟联审、26 个上游模块原文和入口检查。v1.8 与 v1.9 可在同一 SQLite 文件续跑，回退后仍能拦住被拒稿的下游，修订后的有效令牌可批准。验证使用本地夹具和模拟 CLI，真实模型调用待验证。
+
+以上 v1.9 一节对照本仓库的版本线，补充几点（v1.9.1 加注）：
+
+- “基于 v1.8”指作者自己的 v1.8，不含本仓库 v1.8.1 的修改：`retry` 接受中断待核的节点、`InputRejected` 记下原因、审查节点的声明在 `init` 和 `run` 前核对、调用 Claude Code 的测试只用模拟程序、收票接受 BOM 等，见下面 v1.8.1 一节。v1.9.1 把 v1.9 的改动合到了 v1.8.1 上。
+- “图执行器 v0.1.4”指 v1.9 包里在 v0.1.3 上加了 `reject` 的那一版，和本仓库 v1.8.1 的图执行器 v0.1.4 不是同一样东西；合在一起以后，本仓库叫 v0.1.5。
+- “拒绝绑定当前审批令牌、输入指纹和修订号”：v1.9 的退回按指纹认版本，指纹里含修订号，内容改回原样时会重新送审；v1.9.1 改成按内容记，见上面 v1.9.1 一节。
+- “验收覆盖 46 项 BJM 测试、17 项图执行器测试”和 v1.9 包里的测试对得上，是作者那条线上的数目；本仓库合并以后是 `tests/` 53 项、图执行器 33 项。“26 个上游模块原文和入口检查”在 v1.9 包里没有对应的测试，这次另外用脚本核过：展开目录和官方 ZIP 逐字节相同，`references/methods.md` 的 26 个链接都能打开、正好对上 `skills/` 下的 26 个目录。包里的测试不检查这一项。
+- “v1.8 与 v1.9 可在同一 SQLite 文件续跑”：本仓库核的是 v1.8.1 和 v1.9.1 之间，见上面 v1.9.1 一节的“回退和兼容”；另外用作者的 v1.8 打开过 v1.9.1 写了退回的库，结果和 v1.8.1 相同，只是 `retry` 的报错用词不同。
+- Agent Skills 0.6.17 的 SHA-256 和提交号核对过，对得上；“2026-11-19 台北时间”和 ZIP 里记的时间一致。OpenAI Agents SDK v0.25.0、Temporal OSCAR 案例两个链接和“日期均为 2026-11-18”，没有联网核对。达尔文 v3.0.2 一条说的是 v1.7 一节里那一版，这次也没有联网核对。日期 2026-11-20 是 v1.9 自己记的。
+
 ## v1.8.1
 
 2026-11-19。在作者交来的 v1.8 上合入本仓库 v1.5.1 的修改和仓库自有的文件，再按复核改了几处；在本仓库里，上一版是 v1.5.1。协议正文、`scripts/workflow.py`、`scripts/blind_review.py`、检查点格式和附带的 Agent Skills 0.6.16 与 v1.5.1 相同。

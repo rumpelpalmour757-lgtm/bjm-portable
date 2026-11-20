@@ -1330,7 +1330,7 @@ acceptance_ref: null          # 用户明确决定及对应成果版本
 
 ### 改编依据
 
-参考 Addy Osmani 的 Agent Skills，依据当时用户提供的 `agent-skills-main.zip` 快照（0.6.15 前后的 main 分支）。下表为压缩包根目录内的相对路径，用于追溯思路。这些路径在本包所带的 0.6.16 标签版（`vendor/agent-skills-0.6.16/`）里都还在；其中 6 个在 0.6.16 里改过（`spec-driven-development`、`planning-and-task-breakdown`、`code-review-and-quality`、`debugging-and-error-recovery`、`constraint-driven-development` 四个模块的 `SKILL.md` 和 `evals/README.md`），本文没有据此改写，也没有逐条重新对照。本文按 BJM 和创作场景重新表述。原包采用 MIT 许可证。
+参考 Addy Osmani 的 Agent Skills，依据当时用户提供的 `agent-skills-main.zip` 快照（0.6.15 前后的 main 分支）。下表为压缩包根目录内的相对路径，用于追溯思路。这些路径在本包所带的 0.6.17 标签版（`vendor/agent-skills-0.6.17/`）里都还在；其中 6 个在 0.6.16 里改过（`spec-driven-development`、`planning-and-task-breakdown`、`code-review-and-quality`、`debugging-and-error-recovery`、`constraint-driven-development` 五个模块的 `SKILL.md` 和 `evals/README.md`），0.6.17 又改了 4 个（`using-agent-skills`、`spec-driven-development`、`code-review-and-quality` 三个模块的 `SKILL.md` 和 `evals/README.md`），本文没有据此改写，也没有逐条重新对照。本文按 BJM 和创作场景重新表述。原包采用 MIT 许可证。
 
 | 本版位置 | 来源 |
 |---|---|
