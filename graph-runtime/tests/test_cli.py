@@ -169,6 +169,244 @@ class WorkflowCLITest(unittest.TestCase):
         final = self.cli("approve", "approve", "--", older)["nodes"]
         self.assertEqual(final["approve"]["status"], "SUCCEEDED")
 
+    def test_rejection_persists_until_a_new_revision_is_approved(self):
+        graph = self.write_graph([
+            {"id": "draft", "inputs": {"text": "Original draft"}, "retry_safe": True},
+            {"id": "gate", "kind": "approval", "deps": ["draft"]},
+            {"id": "release", "deps": ["gate"], "inputs": {"text": "Release the artifact"}},
+            {"id": "independent", "inputs": {"text": "Unrelated work"}},
+        ])
+        self.cli("init", graph)
+        initial = self.cli("run")["nodes"]
+        first_gate = initial["gate"]
+        self.assertEqual(first_gate["status"], "AWAITING_APPROVAL")
+        old_token = first_gate["token"]
+        before = self.cli("events")
+        self.assertIn("stale or invalid approval token", self.cli("reject", "gate", "--", "未知令牌", expected=2))
+        self.assertEqual(self.cli("events"), before)
+
+        rejected = self.cli("reject", "gate", "--", old_token)["nodes"]
+        self.assertEqual(rejected["gate"], {
+            **first_gate, "status": "REJECTED", "token": None, "error": "ApprovalRejected",
+        })
+        event = self.cli("events")[-1]
+        self.assertEqual(event["event"], "APPROVAL_REJECTED")
+        self.assertEqual(event["node_id"], "gate")
+        self.assertEqual(set(event["details"]), {"fingerprint", "revision", "content_sha256"})
+        self.assertEqual(event["details"]["fingerprint"], first_gate["fingerprint"])
+        self.assertEqual(event["details"]["revision"], first_gate["revision"])
+        self.assertIn("was rejected", self.cli("approve", "gate", "--", old_token, expected=2))
+        self.assertIn("was rejected", self.cli("reject", "gate", "--", old_token, expected=2))
+        self.cli("retry", "gate", expected=2)
+        self.cli("resolve", "gate", '{"approved":true}', expected=2)
+        self.cli("edit", "draft", '{"text":"Original draft"}')
+        self.assertEqual(self.cli("run")["nodes"], rejected)
+        self.assertEqual(self.cli("events"), [*before, event])
+        self.assertEqual(rejected["release"]["status"], "PENDING")
+        self.assertEqual(rejected["release"]["attempt"], 0)
+        self.assertEqual(rejected["independent"], initial["independent"])
+
+        self.cli("edit", "draft", '{"text":"Revised draft"}')
+        revised = self.cli("run")["nodes"]
+        self.assertEqual(revised["gate"]["status"], "AWAITING_APPROVAL")
+        self.assertEqual(revised["gate"]["revision"], first_gate["revision"] + 1)
+        self.assertNotEqual(revised["gate"]["fingerprint"], first_gate["fingerprint"])
+        new_token = revised["gate"]["token"]
+        self.assertNotEqual(old_token, new_token)
+        self.cli("reject", "gate", "--", old_token, expected=2)
+        self.cli("approve", "gate", "--", old_token, expected=2)
+        self.cli("approve", "gate", "--", new_token)
+        complete = self.cli("run")["nodes"]
+        self.assertEqual(complete["gate"]["status"], "SUCCEEDED")
+        self.assertEqual(complete["release"]["status"], "SUCCEEDED")
+        self.assertEqual(complete["release"]["attempt"], 1)
+        self.assertEqual(complete["independent"], initial["independent"])
+
+    def test_rejects_only_the_selected_approval_and_accepts_a_legacy_token(self):
+        graph = self.write_graph([
+            {"id": "gate-a", "kind": "approval"},
+            {"id": "gate-b", "kind": "approval"},
+            {"id": "dependent-b", "deps": ["gate-b"], "inputs": {"text": "Group B"}},
+        ])
+        self.cli("init", graph)
+        first = self.cli("run")["nodes"]
+        self.cli("reject", "gate-a", "--", first["gate-b"]["token"], expected=2)
+        legacy_token = "-legacy-reject"
+        with closing(sqlite3.connect(self.workspace / "workflow.db")) as db, db:
+            db.execute("UPDATE nodes SET token=? WHERE run_id=? AND id=?",
+                       (legacy_token, "demo", "gate-a"))
+        rejected = self.cli("reject", "gate-a", "--", legacy_token)["nodes"]
+        self.assertEqual(rejected["gate-a"]["status"], "REJECTED")
+        self.assertEqual(rejected["gate-b"], first["gate-b"])
+        self.cli("approve", "gate-b", "--", first["gate-b"]["token"])
+        finished = self.cli("run")["nodes"]
+        self.assertEqual(finished["gate-a"], rejected["gate-a"])
+        self.assertEqual(finished["dependent-b"]["status"], "SUCCEEDED")
+
+    def test_a_rejection_stays_with_the_content_it_turned_down(self):
+        graph = self.write_graph([
+            {"id": "draft", "inputs": {"text": "Original draft"}, "retry_safe": True},
+            {"id": "gate", "kind": "approval", "deps": ["draft"]},
+            {"id": "release", "deps": ["gate"], "inputs": {"text": "Release the artifact"}},
+        ])
+        self.cli("init", graph)
+        first = self.cli("run")["nodes"]
+        self.cli("reject", "gate", "--", first["gate"]["token"])
+        (rejection,) = [event for event in self.cli("events") if event["event"] == "APPROVAL_REJECTED"]
+
+        self.cli("edit", "draft", '{"text":"Something else"}')
+        other = self.cli("run")["nodes"]["gate"]
+        self.assertEqual(other["status"], "AWAITING_APPROVAL")
+        # Changing the draft back, or adding an input that leaves its output alone, shows the same content.
+        for inputs in ('{"text":"Original draft"}', '{"text":"Original draft","unused":1}'):
+            with self.subTest(inputs=inputs):
+                self.cli("edit", "draft", inputs)
+                state = self.cli("run")["nodes"]
+                self.assertEqual(state["draft"]["output"], first["draft"]["output"])
+                self.assertEqual(state["gate"]["status"], "REJECTED")
+                self.assertIsNone(state["gate"]["token"])
+                self.assertEqual(state["gate"]["error"],
+                                 "ApprovalRejected: the same content was rejected at revision 1")
+                self.assertEqual(state["release"]["status"], "PENDING")
+                kept = self.cli("events")[-1]
+                self.assertEqual(kept["event"], "REJECTION_KEPT")
+                self.assertEqual(kept["details"]["rejected_revision"], 1)
+                self.assertEqual(kept["details"]["content_sha256"], rejection["details"]["content_sha256"])
+                self.assertEqual(kept["details"]["revision"], state["gate"]["revision"])
+                self.assertIn("was rejected", self.cli("approve", "gate", "--", other["token"], expected=2))
+                self.assertEqual(self.cli("run")["nodes"], state)
+
+        # Asking the reviewer to look again is explicit: it changes the approval node's own inputs.
+        self.cli("edit", "gate", '{"note":"Reviewer asked to see it again"}')
+        reopened = self.cli("run")["nodes"]["gate"]
+        self.assertEqual(reopened["status"], "AWAITING_APPROVAL")
+        self.cli("approve", "gate", "--", reopened["token"])
+        self.assertEqual(self.cli("run")["nodes"]["release"]["status"], "SUCCEEDED")
+
+    def test_a_rejection_stays_with_the_approval_node_that_made_it(self):
+        graph = self.write_graph([
+            {"id": "draft", "inputs": {"text": "Shared draft"}, "retry_safe": True},
+            {"id": "legal", "kind": "approval", "deps": ["draft"]},
+            {"id": "editor", "kind": "approval", "deps": ["draft"]},
+        ])
+        self.cli("init", graph)
+        first = self.cli("run")["nodes"]
+        self.cli("reject", "legal", "--", first["legal"]["token"])
+        # Both approvals see the same content; only the one the reviewer turned down stays rejected.
+        self.cli("edit", "draft", '{"text":"Shared draft","unused":1}')
+        state = self.cli("run")["nodes"]
+        self.assertEqual(state["legal"]["status"], "REJECTED")
+        self.assertEqual(state["editor"]["status"], "AWAITING_APPROVAL")
+        self.assertTrue(state["editor"]["token"])
+        self.assertNotEqual(state["editor"]["token"], first["editor"]["token"])
+
+    def test_a_new_run_does_not_inherit_an_earlier_runs_rejection(self):
+        graph = self.write_graph([
+            {"id": "draft", "inputs": {"text": "Original draft"}, "retry_safe": True},
+            {"id": "gate", "kind": "approval", "deps": ["draft"]},
+        ])
+        self.cli("init", graph)
+        self.cli("reject", "gate", "--", self.cli("run")["nodes"]["gate"]["token"])
+        self.command[-1] = "second"
+        self.cli("init", graph)
+        second = self.cli("run")["nodes"]["gate"]
+        self.assertEqual(second["status"], "AWAITING_APPROVAL")
+        self.assertTrue(second["token"])
+
+    def test_approve_refuses_a_token_for_content_already_rejected(self):
+        graph = self.write_graph([
+            {"id": "draft", "inputs": {"text": "Original draft"}, "retry_safe": True},
+            {"id": "gate", "kind": "approval", "deps": ["draft"]},
+            {"id": "release", "deps": ["gate"], "inputs": {"text": "Release the artifact"}},
+        ])
+        self.cli("init", graph)
+        self.cli("reject", "gate", "--", self.cli("run")["nodes"]["gate"]["token"])
+        self.cli("edit", "draft", '{"text":"Original draft","unused":1}')
+        self.assertEqual(self.cli("run")["nodes"]["gate"]["status"], "REJECTED")
+        # A version that does not compare content, such as v1.8.1, issues a token here; model that directly.
+        with closing(sqlite3.connect(self.workspace / "workflow.db")) as db, db:
+            db.execute("UPDATE nodes SET status = 'AWAITING_APPROVAL', token = ?, error = NULL "
+                       "WHERE run_id = ? AND id = ?", ("bjm_older", "demo", "gate"))
+        before, events = self.cli("status"), self.cli("events")
+        self.assertIn("gate: the same content was rejected at revision 1",
+                      self.cli("approve", "gate", "--", "bjm_older", expected=2))
+        self.assertEqual(self.cli("status"), before)
+        self.assertEqual(self.cli("events"), events)
+        self.assertEqual(self.cli("reject", "gate", "--", "bjm_older")["nodes"]["gate"]["status"], "REJECTED")
+        self.assertEqual(self.cli("run")["nodes"]["release"]["status"], "PENDING")
+
+    def test_decisions_name_the_state_that_blocks_them(self):
+        graph = self.write_graph([
+            {"id": "draft", "inputs": {"text": "Draft"}, "retry_safe": True},
+            {"id": "gate", "kind": "approval", "deps": ["draft"]},
+            {"id": "solo", "kind": "approval"},
+        ])
+        self.cli("init", graph)
+        before = self.cli("events")
+        for command in ("approve", "reject"):
+            with self.subTest(command=command):
+                self.assertIn("not awaiting a decision", self.cli(command, "gate", "--", "bjm_x", expected=2))
+                self.assertIn("draft is not an approval node", self.cli(command, "draft", "--", "bjm_x", expected=2))
+                self.assertIn("unknown node: nowhere", self.cli(command, "nowhere", "--", "bjm_x", expected=2))
+        self.assertEqual(self.cli("events"), before)
+
+        state = self.cli("run")["nodes"]
+        self.cli("approve", "solo", "--", state["solo"]["token"])
+        self.cli("reject", "gate", "--", state["gate"]["token"])
+        settled = self.cli("events")
+        for command in ("approve", "reject"):
+            with self.subTest(command=command):
+                self.assertIn("solo is already approved",
+                              self.cli(command, "solo", "--", state["solo"]["token"], expected=2))
+                self.assertIn("gate was rejected", self.cli(command, "gate", "--", state["gate"]["token"], expected=2))
+        self.assertEqual(self.cli("events"), settled)
+
+    def test_reviews_that_cannot_start_this_run_do_not_need_claude(self):
+        review = {"operation": "claude-review", "model": "sonnet", "focus": "dialogue"}
+        graph = self.write_graph([
+            {"id": "draft", "inputs": {"text": "Draft"}, "retry_safe": True},
+            {"id": "gate", "kind": "approval", "deps": ["draft"]},
+            {"id": "review", "deps": ["gate"], "inputs": review, "retry_safe": True},
+            {"id": "independent", "inputs": {"text": "Unrelated work"}},
+        ])
+        self.cli("init", graph)
+        first = self.cli("run")["nodes"]
+        self.assertEqual(first["gate"]["status"], "AWAITING_APPROVAL")
+        self.assertEqual(first["independent"]["status"], "SUCCEEDED")
+        self.assertEqual(first["review"]["status"], "PENDING")
+        self.assertEqual(self.cli("run")["nodes"], first)
+        self.cli("reject", "gate", "--", first["gate"]["token"])
+        self.assertEqual(self.cli("run")["nodes"]["review"]["status"], "PENDING")
+
+        self.cli("edit", "draft", '{"text":"Revised draft"}')
+        token = self.cli("run")["nodes"]["gate"]["token"]
+        self.cli("approve", "gate", "--", token)
+        before = self.cli("status")
+        self.assertIn("Claude review nodes require run --claude", self.cli("run", expected=2))
+        self.assertEqual(self.cli("status"), before)
+
+    def test_a_broken_review_declaration_stops_the_run_even_while_the_review_waits(self):
+        review = {"operation": "claude-review", "model": "sonnet", "focus": "dialogue"}
+        graph = self.write_graph([
+            {"id": "draft", "inputs": {"text": "Draft"}, "retry_safe": True},
+            {"id": "gate", "kind": "approval", "deps": ["draft"]},
+            {"id": "review", "deps": ["gate"], "inputs": review, "retry_safe": True},
+            {"id": "independent", "inputs": {"text": "Unrelated work"}},
+        ])
+        self.cli("init", graph)
+        self.cli("edit", "review", json.dumps({**review, "focus": ""}))
+        before, events = self.cli("status"), self.cli("events")
+        error = self.cli("run", expected=2)
+        self.assertIn("review: Claude review requires a nonempty focus; fix its inputs with edit", error)
+        self.assertEqual(self.cli("status"), before)
+        self.assertEqual(self.cli("events"), events)
+
+        self.cli("edit", "review", json.dumps(review))
+        state = self.cli("run")["nodes"]
+        self.assertEqual(state["gate"]["status"], "AWAITING_APPROVAL")
+        self.assertEqual(state["independent"]["status"], "SUCCEEDED")
+        self.assertEqual(state["review"]["status"], "PENDING")
+
     def test_process_loss_requires_resolution_for_an_unsafe_action(self):
         graph = self.write_graph(
             [

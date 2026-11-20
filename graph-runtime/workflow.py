@@ -75,9 +75,10 @@ def parser_for_cli():
     edit = commands.add_parser("edit")
     edit.add_argument("node")
     edit.add_argument("inputs", type=object_argument)
-    approve = commands.add_parser("approve")
-    approve.add_argument("node")
-    approve.add_argument("token")
+    for command in ("approve", "reject"):
+        decision = commands.add_parser(command)
+        decision.add_argument("node")
+        decision.add_argument("token")
     resolve = commands.add_parser("resolve")
     resolve.add_argument("node")
     resolve.add_argument("output", type=object_argument)
@@ -98,9 +99,11 @@ def run_tasks(engine, args):
     demo = demo_handler(args.fail_before)
     executable = None
 
-    def preflight(nodes):
+    def preflight(queued, runnable):
         nonlocal executable
-        if not check_review_nodes(nodes, "fix its inputs with edit, or its deps in a new run"):
+        # Every queued review's declaration is checked, but Claude Code is needed only if one can start now.
+        check_review_nodes(queued, "fix its inputs with edit, or its deps in a new run")
+        if not any(node["inputs"].get("operation") == OPERATION for node in runnable):
             return
         if not args.claude:
             raise ValueError("Claude review nodes require run --claude")
@@ -111,6 +114,9 @@ def run_tasks(engine, args):
 
     def handle(node, dependencies):
         if node["inputs"].get("operation") == OPERATION and node["id"] != args.fail_before:
+            if executable is None:
+                # The engine only dispatches nodes it showed to preflight; never start an unchecked program.
+                raise RuntimeError("Claude review node was not checked before the run")
             return review(executable, node, dependencies)
         return demo(node, dependencies)
 
@@ -138,6 +144,8 @@ def main():
             engine.edit(run_id, args.node, args.inputs)
         elif args.command == "approve":
             engine.approve(run_id, args.node, args.token)
+        elif args.command == "reject":
+            engine.reject(run_id, args.node, args.token)
         elif args.command == "resolve":
             engine.resolve(run_id, args.node, args.output)
         result = engine.events(run_id) if args.command == "events" else engine.status(run_id)

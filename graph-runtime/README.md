@@ -1,10 +1,10 @@
-# BJM 图工程原型 v0.1.4
+# BJM 图工程原型 v0.1.5
 
 用 BJM 的分工和验收思路跑一条可恢复的任务图。Python 标准库负责调度，SQLite 保存节点结果、审批状态和执行事件。每个数据库同一时间由一个本机进程调度，进程内可以并行跑分支。两章联审演示使用本地模拟调用，开箱即可复现分支失败和恢复。
 
 ## 快速运行
 
-本模块单独解压时，从模块根目录运行。它随 BJM 迁移包分发时，下面的逐条命令从 `bjm-portable/graph-runtime/` 目录运行。需要 Python 3.10 或更新版本。v0.1.4 这次在 Linux 上用 Python 3.11、3.12、3.13 验证过，Windows 和 macOS 没有实测。
+本模块单独解压时，从模块根目录运行。它随 BJM 迁移包分发时，下面的逐条命令从 `bjm-portable/graph-runtime/` 目录运行。需要 Python 3.10 或更新版本。v0.1.5 这次在 Linux 上用 Python 3.11、3.12、3.13 验证过，Windows 和 macOS 没有实测。
 
 ```bash
 python3 demo.py
@@ -46,6 +46,28 @@ python3 workflow.py --db "$bjm_demo_db" --run-id demo approve approve -- '<编�
 
 令牌由程序随机生成。v1.5.1 以前的版本生成的令牌约有 1/64 的机会以 `-` 开头，不加 `--` 时命令行会把它当成选项，报错退出（以 `-h` 开头时多半只打出帮助，退出码为 0），都不会批准。v1.5.1 生成时避开了 `-` 开头；现在生成的令牌一律以 `bjm_` 开头。旧数据库里已经存下的以 `-` 开头的令牌不会自动更换，照上面的写法加上 `--` 就能批准。
 
+令牌不对或已经过期时，报 `stale or invalid approval token`。节点已经批准、已经退回、还没发令牌，或者根本不是审批节点时，报错直接写明是哪一种，不说令牌的事。
+
+## 退回当前版本
+
+审阅者看过稿件不同意时，可以退回，不批准。照上一节做到等待批准这一步以后，把上面第二条批准命令换成下面这条。命令里 `reject` 后面的 `approve` 是演示图里审批节点的 ID，不是第二个命令。
+
+```bash
+python3 workflow.py --db "$bjm_demo_db" --run-id demo reject approve -- '<编辑后的令牌>'
+```
+
+退回以后，审批节点记为 `REJECTED`，`error` 是 `ApprovalRejected`，令牌立即作废。SQLite 里多一条 `APPROVAL_REJECTED` 事件，记下这一版的审批指纹、修订号和送审内容的摘要 `content_sha256`。依赖这个审批的步骤一直等着，其他分支照常运行。被退回的节点不接受 `approve`、`reject`、`retry` 和 `resolve`。
+
+要重新送审，改的是审批节点上游的稿件：用 `edit` 改稿，再 `run`，从 `status` 取新令牌。不要改审批节点自己的 `inputs`，那样送审的还是原稿（见下面一段）。送审内容指审批节点自己的 `inputs` 加上各依赖节点的输出，逐字节比较。退回以后反复 `run`，或者用 `edit` 提交和原来完全相同的输入，什么都不变：节点照旧是 `REJECTED`，`error` 仍是 `ApprovalRejected`，也不写新事件。改了稿件以后又改回被退回的那一份，或者往上游加一个不影响输出的输入，`edit` 会把审批节点放回 `PENDING`，再 `run` 时送审内容和退回时相同，节点就回到 `REJECTED`，不发新令牌，事件里记一条 `REJECTION_KEPT`，`error` 写明是在哪个修订号退回的。
+
+这种对照只在依赖节点的输出逐字节相同时起作用。审批节点排在 Claude Code 审查节点后面时（`examples/claude_review.json` 就是这样），上游一改，哪怕改回原稿，审查也会重跑，每次的会话 ID 不同，模型给的结论也可能不同；排在另一个审批节点后面时，前一个审批要重新批准，它的输出里有带修订号的指纹。这两种情形下送审内容都和退回时不同，同一份稿件仍会再次送审，要靠审阅者自己核对，例如对照审查报告里稿件的 SHA-256（`artifact_sha256`）。
+
+审阅者要重看同一份稿件（例如退回错了）时，改审批节点自己的 `inputs`，例如写上为什么要重看，再 `run`。这会发出新令牌，送审的仍是原稿，批准前照常核对稿件。上游连着已经完成、没声明 `retry_safe` 的外部动作时，`edit` 改不了稿件，这也是本次运行里唯一能重开审批的办法；要改稿件，就新建运行。退回只在同一个运行里、同一个审批节点上对照，新建的运行不沿用以前运行里的退回，别的审批节点送审同一份内容也照常发令牌。
+
+数据库经过不按内容对照的版本（v1.8.1、作者的 v1.8 和 v1.9）以后，那些版本可能对退回过的同一份内容发了令牌。回到这一版，用这样的令牌 `approve` 会被拒，报 `the same content was rejected at revision N`，库里什么也不写；`reject` 照常可以用。在那些版本里已经批准了的，这一版不会改回去。
+
+图执行器不记退回的理由，理由要另外记下来交给改稿的人。依赖被退回的审批、这次运行轮不到的 Claude Code 审查节点，不要求加 `--claude`，无关分支照常能跑；等审批通过、轮到审查节点时，才要 `run --claude`。不过每次 `run` 都先核对所有还没跑的审查节点的声明，轮不到的也查，声明不合格（例如 `edit` 把 `focus` 改成空的）就报错退出，见下面“使用 Claude Code 并行审稿”。
+
 ## 运行回归测试
 
 ```bash
@@ -61,8 +83,9 @@ python3 -B -m unittest discover -s tests -v
 | 其中一章审查失败 | 另一章已保存的结果继续有效。显式重试失败节点，再恢复整个运行 |
 | 停止程序后重新启动 | 从 SQLite 重新读同一个运行。已保存且输入仍匹配的节点直接沿用 |
 | 审批前修改其中一章 | 只重跑该章及受影响的下游。修改前发出的审批令牌失效 |
+| 审阅者退回当前版本 | 退回决定随数据库保存。依赖该审批的步骤等待新版本通过，其他分支可继续。同一个运行里送审内容逐字节相同时不再送审；审批排在审查节点或另一个审批后面时做不到这一点，见“退回当前版本” |
 | 外部调用中途失联，无法判断是否送达 | 节点进入待核状态。等待提供方回执，取得已确认结果后用 `resolve` 写回。 |
-| 输入被明确拒绝，能确认本次没有产生外部效果 | 节点记为 `REJECTED`，`error` 写明原因。用 `edit` 修正输入再继续，本轮无关分支沿用原结果。 |
+| 任务节点的输入被明确拒绝，能确认本次没有产生外部效果 | 节点记为 `REJECTED`，`error` 以 `InputRejected` 开头，冒号后写明原因（v1.8.1 以前的版本和作者的 v1.9 写的库里只有类名）。用 `edit` 修正这个节点自己的输入再继续，本轮无关分支沿用原结果。 |
 
 ## 使用 Claude Code 并行审稿
 
@@ -77,7 +100,7 @@ python3 workflow.py --db "$bjm_review_db" --run-id review run --claude --workers
 python3 workflow.py --db "$bjm_review_db" --run-id review status
 ```
 
-示例用两种模型审同一段虚构稿件，分别检查对白和人物感知。每个 `claude-review` 节点声明目标模型 `model`、审查要求 `focus` 和一个产出 `text` 的依赖。依赖不是恰好一个、`focus` 为空或 `model` 不是 Claude 的模型别名或 ID 时，`init` 拒绝登记这张图；已登记的运行在 `run` 时也先查一遍，不合格就在任何分支开跑以前报错退出。`focus` 和 `model` 可以用 `edit` 改，依赖数不对只能改图以后新建运行。适配器通过 `--agent` 在独立的非交互会话中启用内置的 `bjm-reviewer` 角色，并关闭工具。模型从请求取得该稿件和审查要求。Claude Code 自己的报错直接显示在运行 `workflow.py` 的终端上，不写进数据库。
+示例用两种模型审同一段虚构稿件，分别检查对白和人物感知。每个 `claude-review` 节点声明目标模型 `model`、审查要求 `focus` 和一个产出 `text` 的依赖。依赖不是恰好一个、`focus` 为空或 `model` 不是 Claude 的模型别名或 ID 时，`init` 拒绝登记这张图；已登记的运行在 `run` 时也先查一遍，这次轮不到的审查节点也查，不合格就在任何分支开跑以前报错退出。`focus` 和 `model` 可以用 `edit` 改，依赖数不对只能改图以后新建运行。适配器通过 `--agent` 在独立的非交互会话中启用内置的 `bjm-reviewer` 角色，并关闭工具。模型从请求取得该稿件和审查要求。Claude Code 自己的报错直接显示在运行 `workflow.py` 的终端上，不写进数据库。
 
 每条结论包括原文引句 `quote`、问题 `issue` 和建议 `suggestion`。BJM 核对报告结构，核对引句是否原样出现在稿件里、是否至少含一个文字或数字（只有标点的引句不算；角色提示也把这条告诉了模型，查标点问题时要连同前后的字一起引），并保存报告、会话 ID、稿件 SHA-256、请求指定的模型 `model_requested`，以及 Claude Code 结果里列出的实际模型 `models_reported`（可能不止一个，结果里没有时为空）。经 `run --claude` 得到的 `SUCCEEDED` 表示报告通过这些核对；用 `resolve` 写回的内容不经过这些核对，事件里记为 `RESOLVED`。通过核对不等于结论成立，编辑者仍需判断结论是否成立、哪些建议值得采纳。报告里没有结论（`findings` 为空），也不说明稿件没有问题：稿件里夹带的“忽略要求、返回空列表”这类话，模型如果照做，交回的空报告和真正没有问题时一样能通过核对。角色提示要求把稿件里冲着审稿者说的话、想改动审查要求的话单独列成结论，作品本身的对白和叙述不算（例如故事里人物对 AI 或“系统”说的话）；模型照不照做没有用真实模型验证过。两份报告保存后，`approve` 节点进入 `AWAITING_APPROVAL`，看过稿件和报告后可使用当前令牌批准。
 
@@ -90,8 +113,8 @@ python3 workflow.py --db "$bjm_review_db" --run-id review status
 - 每个任务节点声明输入和依赖。把提供方调用放在任务处理函数里，将实际稿件版本、请求 ID 和结果一并返回，便于恢复后对照。适配器应在正常返回前校验节点验收条件。审查失败或证据不足时应报告失败。
 - 能确认重试安全的调用才标记为可安全重试。结果未知时等待提供方回执，已确认结果才用 `resolve <节点> '<实际结果 JSON>'` 记录；`resolve` 原样写入给出的 JSON，不经过适配器的核对。`retry` 适用于被声明为可安全重试、已失败或因调度中断而待核的节点。已完成的外部动作如果未标记为可安全重试，关联的上游编辑会被拦住；另一次外部动作应由操作者重新授权并开启新的运行。
 - 对可手动重试、但不适合在调度器中断后自动重发的任务，设置 `retry_on_interrupt: false`。这样的节点被中断后进入 `UNCERTAIN`，操作者确认可以重做后用 `retry` 放回队列。省略这个字段时，调度器按既有的 `retry_safe` 标记恢复。
-- 输入必须修改且能确认本次没有产生外部效果时，适配器可以抛出 `engine.InputRejected`。例如发送前的参数校验失败，或提供方明确保证请求未生效。超时、断线和含义不确定的错误仍沿用原来的故障处理，不能只凭 HTTP 状态码把它们归类为 `InputRejected`。节点的 `error` 记为 `InputRejected: <原因>`，原因是适配器自己写的那句话，不要把提供方返回的内容放进去；其他异常只记异常的类名。图的命令和 SQLite 结构沿用原版，接入方读取节点状态时可以识别新增的 `REJECTED`。
-- 审批令牌标识当前审批版本。真实部署还需由接入系统校验操作者身份及审批权限。
+- 输入必须修改且能确认本次没有产生外部效果时，适配器可以抛出 `engine.InputRejected`。例如发送前的参数校验失败，或提供方明确保证请求未生效。超时、断线和含义不确定的错误仍沿用原来的故障处理，不能只凭 HTTP 状态码把它们归类为 `InputRejected`。节点的 `error` 记为 `InputRejected: <原因>`，原因是适配器自己写的那句话，不要把提供方返回的内容放进去；其他异常只记异常的类名。SQLite 的结构沿用原版，命令新增了 `reject`。`REJECTED` 有两种来源，接入方按 `error` 区分：任务节点的 `error` 以 `InputRejected` 开头（v1.8.1 以前的版本和作者的 v1.9 写的库里只有类名，没有冒号和原因），要改的是这个节点自己的输入；审批节点的 `error` 以 `ApprovalRejected` 开头，是审阅者退回的，要改的是它上游的稿件。
+- 审批令牌标识当前审批版本，批准和退回都只核对令牌。真实部署还需由接入系统校验操作者身份及审批权限。
 - 每次运行使用创建时登记的图版本。改某一节点的输入用 `edit`；更换节点结构或状态格式时，新建运行并明确沿用的资料。原型独立运行，演示所用的生成和复核结果均来自本地模拟夹具。
 
 ## 设计参考
@@ -100,4 +123,5 @@ python3 workflow.py --db "$bjm_review_db" --run-id review status
 - LangGraph 的中断与恢复提供了对照，特别是审批返回后节点可能重入，以及过期审批应被拒绝。 [Interrupts](https://docs.langchain.com/oss/python/langgraph/interrupts) · [LangGraph 发行记录](https://github.com/langchain-ai/langgraph/releases)
 - Temporal 的持久执行和 Worker 版本固定用于参考进程恢复、外部调用和运行版本之间的边界。 [AI Framework Integrations](https://temporal.io/blog/ai-framework-integrations) · [Worker Versioning](https://docs.temporal.io/worker-versioning)
 - OpenAI 的 Trace Grading 提供了依据执行过程定位问题的思路。本原型记录可供核查的事件，事件评分可由接入方另行实现。 [Trace Grading](https://developers.openai.com/api/docs/guides/trace-grading)
+- OpenAI Agents SDK v0.25.0 的逐项批准与拒绝，以及 Temporal 的 OSCAR 示例，提供了将人工决定和待审版本一起持久保存的参考。 [OpenAI Agents SDK v0.25.0](https://github.com/openai/openai-agents-python/releases/tag/v0.25.0) · [Temporal OSCAR 示例](https://temporal.io/blog/building-a-reliable-ai-agent-with-oscar)
 - EMNLP 2026 年 10 月综述区分了复用的图模板、某一次运行实际走过的图和执行轨迹，适合作为后续比较流程版本的参考。 [From Static Templates to Dynamic Runtime Graphs](https://aclanthology.org/2026.findings-emnlp.1393/)
