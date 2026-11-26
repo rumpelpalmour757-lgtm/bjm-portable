@@ -349,6 +349,31 @@ class ClaudeReviewCLITest(unittest.TestCase):
             self.assertIsNone(nodes[review]["output"])
         self.assertEqual(nodes["approve"]["status"], "PENDING")
 
+    def test_cli_caps_review_nodes_and_keeps_the_existing_approval_flow(self):
+        initialized = self.initialize()
+        events = self.cli("events")
+        for limit in ("0", "-1"):
+            self.assertIn("--claude-workers must be a positive integer",
+                          self.cli("run", "--claude", "--claude-workers", limit, expected=2))
+        self.assertEqual(self.cli("status"), initialized)
+        self.assertEqual(self.cli("events"), events)
+        self.assertEqual(self.call_log(), [])
+
+        result = self.cli("run", "--claude", "--workers", "4", "--claude-workers", "1")
+        nodes = result["nodes"]
+        self.assertEqual(nodes["review-a"]["status"], "SUCCEEDED")
+        self.assertEqual(nodes["review-b"]["status"], "SUCCEEDED")
+        self.assertEqual(nodes["approve"]["status"], "AWAITING_APPROVAL")
+        self.assertCountEqual([call["task"]["focus"] for call in self.call_log()], ["dialogue", "continuity"])
+        events = [(event["node_id"], event["event"]) for event in self.cli("events")]
+        # Either draft may finish first, so compare the reviews in the order they started.
+        started = {review: events.index((review, "STARTED")) for review in ("review-a", "review-b")}
+        finished = {review: events.index((review, "SUCCEEDED")) for review in ("review-a", "review-b")}
+        first, second = sorted(started, key=started.get)
+        self.assertLess(finished[first], started[second])
+        self.assertEqual(self.cli("run", "--claude", "--claude-workers", "1"), result)
+        self.assertEqual(len(self.call_log()), 2)
+
 
 if __name__ == "__main__":
     unittest.main()
