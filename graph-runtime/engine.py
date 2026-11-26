@@ -14,6 +14,9 @@ import secrets
 import sqlite3
 
 
+SQLITE_MAX_INTEGER = (1 << 63) - 1
+
+
 SCHEMA = """
 BEGIN;
 CREATE TABLE IF NOT EXISTS runs (
@@ -126,7 +129,7 @@ def _can_retry_interrupted(spec):
 
 
 class Engine:
-    def __init__(self, db_path):
+    def __init__(self, db_path, *, initialize=True):
         self.db_path = Path(db_path).resolve()
         self.lock_path = self.db_path.with_name(self.db_path.name + ".lock")
         schema_version = 0
@@ -134,6 +137,8 @@ class Engine:
             with self._connect() as db:
                 schema_version = db.execute("PRAGMA user_version").fetchone()[0]
         if schema_version == 0:
+            if not initialize:
+                raise ValueError("database is not initialized; run init first")
             with _exclusive(self.lock_path), self._connect() as db:
                 db.execute("PRAGMA journal_mode = WAL")
                 db.executescript(SCHEMA)
@@ -272,10 +277,29 @@ class Engine:
             nodes[name] = node
         return {"run_id": run_id, "graph_version": version, "nodes": nodes}
 
-    def events(self, run_id):
+    def events(self, run_id, *, after=None, limit=None):
+        """Read one run's ordered event rows, optionally from an exclusive cursor."""
+        if after is not None and (type(after) is not int or not 0 <= after <= SQLITE_MAX_INTEGER):
+            raise ValueError("after must be a nonnegative SQLite integer")
+        if limit is not None:
+            if after is None:
+                raise ValueError("limit requires an after cursor")
+            if type(limit) is not int or not 1 <= limit <= SQLITE_MAX_INTEGER:
+                raise ValueError("limit must be a positive SQLite integer")
+
+        query = "SELECT * FROM events WHERE run_id = ?"
+        parameters = [run_id]
+        if after is not None:
+            query += " AND id > ?"
+            parameters.append(after)
+        query += " ORDER BY id"
+        if limit is not None:
+            query += " LIMIT ?"
+            parameters.append(limit)
+
         with self._connect() as db:
             self._run_info(db, run_id)
-            rows = db.execute("SELECT * FROM events WHERE run_id = ? ORDER BY id", (run_id,))
+            rows = db.execute(query, parameters)
             return [dict(row, details=_decode(row["details"])) for row in rows]
 
     def _recover(self, db, run_id, nodes):

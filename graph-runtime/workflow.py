@@ -72,7 +72,9 @@ def parser_for_cli():
                      help="limit concurrent Claude Code review nodes within the worker pool")
     run.add_argument("--fail-before", metavar="NODE", help="simulate a timeout in the demo adapter")
     commands.add_parser("status")
-    commands.add_parser("events")
+    events = commands.add_parser("events")
+    events.add_argument("--after", metavar="ID", type=int, help="return events with an ID greater than ID")
+    events.add_argument("--limit", metavar="N", type=int, help="return at most N events when --after is set")
     commands.add_parser("retry").add_argument("node")
     edit = commands.add_parser("edit")
     edit.add_argument("node")
@@ -98,8 +100,6 @@ def check_review_nodes(nodes, remedy):
 
 
 def run_tasks(engine, args):
-    if args.claude_workers is not None and args.claude_workers < 1:
-        raise ValueError("--claude-workers must be a positive integer")
     demo = demo_handler(args.fail_before)
     executable = None
 
@@ -132,9 +132,15 @@ def main():
     parser = parser_for_cli()
     args = parser.parse_args()
     try:
+        if args.command == "run":
+            # Checked before the database is opened, so a bad limit leaves the file as it was.
+            if args.workers < 1:
+                raise ValueError("--workers must be a positive integer")
+            if args.claude_workers is not None and args.claude_workers < 1:
+                raise ValueError("--claude-workers must be a positive integer")
         if args.command != "init" and not args.db.is_file():
             raise ValueError("database does not exist; initialize the run first")
-        engine = Engine(args.db)
+        engine = Engine(args.db, initialize=args.command == "init")
         run_id = args.run_id
         if args.command == "init":
             graph = json.loads(args.graph.read_text(encoding="utf-8"))
@@ -153,7 +159,10 @@ def main():
             engine.reject(run_id, args.node, args.token)
         elif args.command == "resolve":
             engine.resolve(run_id, args.node, args.output)
-        result = engine.events(run_id) if args.command == "events" else engine.status(run_id)
+        if args.command == "events":
+            result = engine.events(run_id, after=args.after, limit=args.limit)
+        else:
+            result = engine.status(run_id)
     except (KeyError, OSError, RuntimeError, ValueError, sqlite3.Error) as error:
         parser.exit(2, f"workflow: {error}\n")
     print(json.dumps(result, ensure_ascii=False, indent=2, allow_nan=False))

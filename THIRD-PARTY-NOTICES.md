@@ -11,11 +11,11 @@
 
 | 组件 | 版权行 | 包里的哪些文件 | 许可文件 |
 |:-----|:-------|:---------------|:---------|
-| [Agent Skills](https://github.com/addyosmani/agent-skills) 0.6.17 | Copyright (c) 2025 Addy Osmani | `vendor/agent-skills-0.6.17/`（展开目录）和 `vendor/agent-skills-0.6.17.zip`（标签源码 ZIP，原样保留） | `vendor/agent-skills-0.6.17/LICENSE`，ZIP 里也有同一份 |
+| [Agent Skills](https://github.com/addyosmani/agent-skills) 0.6.18 | Copyright (c) 2025 Addy Osmani | `vendor/agent-skills-0.6.18/`（展开目录）和 `vendor/agent-skills-0.6.18.zip`（标签源码 ZIP，原样保留） | `vendor/agent-skills-0.6.18/LICENSE`，ZIP 里也有同一份 |
 
-- 标签源码 ZIP 的 SHA-256：`f2d2dfca1ed15b78364623c6d303c626a0518184136520644ec7b15d4ba3aeb0`；ZIP 注释里记的提交是 `8c99fa36d90068c82d547f7c12a9d67a3e95f4ee`。
+- 标签源码 ZIP 的 SHA-256：`d6bade14a2fec866be3c44bcba7ca5cd0817d7856bb10d175e4a9b7acc5a4065`；ZIP 注释里记的提交是 `e997ac5b9a74eab332d5e9793bb38a38c8cfdd74`。
 - 展开目录和 ZIP 的差别：原包里的符号链接 `.opencode/skills -> ../skills/` 只在 ZIP 里，展开目录没有 `.opencode/`。其余文件逐字节相同；`hooks/` 下 7 个、`skills/idea-refine/scripts/` 下 1 个和 `skills/accessibility-engineering/scripts/` 下 1 个 shell 脚本照 ZIP 保留可执行位。
-- `references/bjm-v3.2.md` 参考 Agent Skills 改写，出处见那一页“改编依据”一节。那一节写的是当时依据的 `agent-skills-main.zip` 快照（0.6.15 前后的 main 分支）；本仓库带的是 0.6.17 标签版。
+- `references/bjm-v3.2.md` 参考 Agent Skills 改写，出处见那一页“改编依据”一节。那一节写的是当时依据的 `agent-skills-main.zip` 快照（0.6.15 前后的 main 分支）；本仓库带的是 0.6.18 标签版。
 - 再分发 `vendor/` 下的文件时，请把 Agent Skills 的版权行和许可声明一起带上。
 
 Agent Skills 的许可声明原文如下，配上表里的版权行：
@@ -48,4 +48,5 @@ SOFTWARE.
 - `CHANGELOG.md` 的 v1.6 和 v1.7 两节链接了 [Temporal Google GenAI 1.0.0](https://github.com/temporalio/ai-integrations/releases/tag/python/google_genai/v1.0.0) 和 [OpenAI Agents SDK v0.25.0](https://github.com/openai/openai-agents-python/releases/tag/v0.25.0) 的发布页。图执行器参考了前者把必须改输入的错误和可以重试的故障分开、后者减少重复计算输入指纹的思路。照这两节的记录，代码是按 BJM 自己的调度器另外写的；相关改动只有几行（`engine.py` 的 `InputRejected` 和派发前才算指纹），这次没有联网和上游逐行对照，仓库里没有它们的代码。
 - `CHANGELOG.md` 的 v1.9 一节和 `graph-runtime/README.md` 链接了 [OpenAI Agents SDK v0.25.0](https://github.com/openai/openai-agents-python/releases/tag/v0.25.0) 的发布页和 [Temporal 的 OSCAR 案例](https://temporal.io/blog/building-a-reliable-ai-agent-with-oscar)。图执行器的 `reject` 参考了把人工决定和待审版本一起保存的思路：批准和退回共用 `engine.py` 里的 `_decide_approval`，几十行，按 BJM 自己的审批节点写，仓库里没有这两个项目的代码；这次没有联网和上游逐行对照，两个链接和它们的日期也没有核对。退回按送审内容对照（`_approval_content`、`_rejected_revision`，以及 `run` 和 `_decide_approval` 里用到它们的几行）是本仓库 v1.9.1 复核时另加的，不是从这两个项目参考来的。
 - `CHANGELOG.md` 的 v1.10 和 v1.10.1 两节、`graph-runtime/README.md` 链接了 Google ADK 的[提交 5e4f0e1](https://github.com/google/adk-python/commit/5e4f0e18cfe869a183901192f92c86d7574881b0)，v1.10 一节还链接了它 v2.15.0 的发布页。照 v1.10 的版本记录，图执行器的 `--claude-workers` 参考了它给并行工作节点另设上限的思路；`engine.py` 里按操作计数的几行（`run()` 的 `worker_limits` 和 `in_flight`）是按 BJM 自己的调度器写的，仓库里没有 ADK 的代码。这次用 git 取下 v2.15.0 标签和这个提交核过，读了提交的说明和改动：它给 `LlmAgent` 加一个带校验的字段，转交给 ADK 原有的并行工作节点，和 BJM 的写法不同；ADK 原有的那部分限流代码不在这个提交里，没有对照。发布页和提交的网页这次都打不开，没有看到。v1.10 一节还链接了 LangGraph 1.2.24、Temporal 的合作生态文章、OpenAI Agents SDK v0.25.0、Agent Skills 0.6.17 和达尔文 v3.0.2，照那一节的说法只是同期看过或核对过，这一版没有据此改动。
+- `CHANGELOG.md` 的 v1.11 和 v1.12 两节链接了 [Temporal Python SDK 1.37.0](https://github.com/temporalio/sdk-python/releases/tag/1.37.0)、Google ADK v2.15.1、OpenAI Agents SDK v0.26.0、LangGraph 1.2.24、LangGraph CLI 0.4.44 和达尔文 v3.0.2 的发布页，以及 arXiv 上的预印本《fork() for Agents: Agent Kernel for Non-blocking LLM Orchestration》。v1.11 一节说 `events --after` 参考了 Temporal Python SDK 1.37.0“在分页执行回执中保留运行标识的做法”。复核时读了 1.37.0 的上游版本记录，对得上的只有一条：工作者分页提交工作流任务完成消息时，每一页都带上 `resource_id`（`workflow:<工作流 ID>`），好让代理不解码任务令牌就认出是哪个工作流。这说的是工作者交给服务端的消息，不是读执行记录，和 BJM 的做法不同。`engine.py` 的 `events()` 里按 `after`、`limit` 拼查询的十几行是按 BJM 自己的事件表写的，仓库里没有 Temporal 的代码。其余几项照那两节的说法只是同期看过或核对过，这一版没有据此改动。这些项目的标签、提交和日期用 git 核过，发布页这次都打不开，没有看到；论文的摘要页取到了。
 - `graph-runtime/README.md` 和 `CHANGELOG.md` 链接了 Claude Code 的文档（子代理、命令行参数、非交互运行）。Claude Code 是使用者在本机另外安装的程序，包里不带；`graph-runtime/claude_review.py` 只在使用者运行 `run --claude` 时把它当作外部命令启动，没有拷贝它的代码或文档。
