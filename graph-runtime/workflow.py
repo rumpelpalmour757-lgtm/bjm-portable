@@ -68,6 +68,8 @@ def parser_for_cli():
     run = commands.add_parser("run")
     run.add_argument("--workers", type=int, default=2)
     run.add_argument("--claude", action="store_true", help="allow declared review nodes to send inputs to Claude Code")
+    run.add_argument("--claude-workers", type=int, metavar="N",
+                     help="limit concurrent Claude Code review nodes within the worker pool")
     run.add_argument("--fail-before", metavar="NODE", help="simulate a timeout in the demo adapter")
     commands.add_parser("status")
     commands.add_parser("events")
@@ -96,6 +98,8 @@ def check_review_nodes(nodes, remedy):
 
 
 def run_tasks(engine, args):
+    if args.claude_workers is not None and args.claude_workers < 1:
+        raise ValueError("--claude-workers must be a positive integer")
     demo = demo_handler(args.fail_before)
     executable = None
 
@@ -120,7 +124,8 @@ def run_tasks(engine, args):
             return review(executable, node, dependencies)
         return demo(node, dependencies)
 
-    engine.run(args.run_id, handle, args.workers, preflight=preflight)
+    limits = {} if args.claude_workers is None else {OPERATION: args.claude_workers}
+    engine.run(args.run_id, handle, args.workers, preflight=preflight, worker_limits=limits)
 
 
 def main():

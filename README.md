@@ -24,16 +24,16 @@
 
 <p align="center">
   <a href="https://github.com/rumpelpalmour757-lgtm/bjm-portable/stargazers"><img alt="Stars" src="https://img.shields.io/github/stars/rumpelpalmour757-lgtm/bjm-portable?style=flat-square&color=23766A&logo=github&logoColor=white&label=Stars"></a>
-  <a href="CHANGELOG.md"><img alt="版本 v1.9.1" src="https://img.shields.io/badge/%E7%89%88%E6%9C%AC-v1.9.1-1F2A44?style=flat-square"></a>
+  <a href="CHANGELOG.md"><img alt="版本 v1.10.1" src="https://img.shields.io/badge/%E7%89%88%E6%9C%AC-v1.10.1-1F2A44?style=flat-square"></a>
   <a href="references/bjm-v3.2.md"><img alt="协议 BJM v3.2" src="https://img.shields.io/badge/%E5%8D%8F%E8%AE%AE-BJM%20v3.2-1F2A44?style=flat-square"></a>
   <a href="references/methods.md"><img alt="工程模块 26 个" src="https://img.shields.io/badge/%E5%B7%A5%E7%A8%8B%E6%A8%A1%E5%9D%97-26%20%E4%B8%AA-1F2A44?style=flat-square"></a>
-  <a href="#可选的本地核验"><img alt="测试 BJM 36 项、匿名对照材料 12 项、收票 5 项、图执行器 33 项" src="https://img.shields.io/badge/%E6%B5%8B%E8%AF%95-36%20%2B%2012%20%2B%205%20%2B%2033%20%E9%A1%B9-1F2A44?style=flat-square"></a>
+  <a href="#可选的本地核验"><img alt="测试 BJM 36 项、匿名对照材料 12 项、收票 5 项、图执行器 38 项" src="https://img.shields.io/badge/%E6%B5%8B%E8%AF%95-36%20%2B%2012%20%2B%205%20%2B%2038%20%E9%A1%B9-1F2A44?style=flat-square"></a>
   <a href="graph-runtime/README.md"><img alt="图执行器需要 Python 3.10+" src="https://img.shields.io/badge/Python-3.10%2B-1F2A44?style=flat-square"></a>
   <a href="LICENSE"><img alt="许可 MIT" src="https://img.shields.io/badge/%E8%AE%B8%E5%8F%AF-MIT-1F2A44?style=flat-square"></a>
 </p>
 
 <p align="center">
-  <a href="https://github.com/rumpelpalmour757-lgtm/bjm-portable/releases/tag/v1.9.1"><img alt="下载完整包（v1.9.1）" src="https://img.shields.io/badge/%E4%B8%8B%E8%BD%BD%E5%AE%8C%E6%95%B4%E5%8C%85-23766A?style=for-the-badge"></a>
+  <a href="https://github.com/rumpelpalmour757-lgtm/bjm-portable/releases/tag/v1.10.1"><img alt="下载完整包（v1.10.1）" src="https://img.shields.io/badge/%E4%B8%8B%E8%BD%BD%E5%AE%8C%E6%95%B4%E5%8C%85-23766A?style=for-the-badge"></a>
   <a href="SKILL.md"><img alt="从入口文件 SKILL.md 开始" src="https://img.shields.io/badge/%E4%BB%8E%E5%85%A5%E5%8F%A3%E6%96%87%E4%BB%B6%E5%BC%80%E5%A7%8B-1F2A44?style=for-the-badge"></a>
 </p>
 
@@ -67,7 +67,7 @@ BJM 只在 AI 读到它时起作用：你把它交给 AI，或者装成技能以
 - **采纳和对外发送等你决定** — 审查通过、你的采纳和对外发送分开记录。AI 不替你说“已采纳”；没有你的授权，不对外发送或发布。
 - **`SKILL.md` 可以带到别的 AI 里用** — 一页就能当提示词用；能装技能的工具可以带上整个目录。脚本只用 Python 标准库。换到别的 AI 或工具里，它们实际照不照做，没有测过。
 
-以上是 BJM 要求 AI 做到的，不是效果保证。规则写进提示词，约束的是 AI 的做法；只有在你用的 AI 工具里实际接上并运行的程序检查，才能在程序上拦住（协议 §2.3、§11.3 也这样写）。`scripts/workflow.py` 只给出判断，本身不拦任何动作。AI 会不会每次照做，取决于你用的那个 AI 和工具。BJM 没有做过“用它和不用它”的效果对照：协议 §11.8 写了怎样在同一道题上对照两版方法，用它和不用它的对照可以照这个办法做，但还没有做过。v1.5 起包里多了准备匿名对照材料的脚本，v1.7 起多了核对已收选票的脚本，对照本身仍然没有做过。v1.8 起图执行器可以让 Claude Code 审稿，测试用的是本地模拟的命令行程序，真实调用没有验证。包里的测试（BJM 36 项、匿名对照材料 12 项、收票 5 项、图执行器 33 项）只说明这几个脚本在测到的那些情形下照说明工作，不说明用了 BJM 交付就更好。
+以上是 BJM 要求 AI 做到的，不是效果保证。规则写进提示词，约束的是 AI 的做法；只有在你用的 AI 工具里实际接上并运行的程序检查，才能在程序上拦住（协议 §2.3、§11.3 也这样写）。`scripts/workflow.py` 只给出判断，本身不拦任何动作。AI 会不会每次照做，取决于你用的那个 AI 和工具。BJM 没有做过“用它和不用它”的效果对照：协议 §11.8 写了怎样在同一道题上对照两版方法，用它和不用它的对照可以照这个办法做，但还没有做过。v1.5 起包里多了准备匿名对照材料的脚本，v1.7 起多了核对已收选票的脚本，对照本身仍然没有做过。v1.8 起图执行器可以让 Claude Code 审稿，测试用的是本地模拟的命令行程序，真实调用没有验证。包里的测试（BJM 36 项、匿名对照材料 12 项、收票 5 项、图执行器 38 项）只说明这几个脚本在测到的那些情形下照说明工作，不说明用了 BJM 交付就更好。
 
 ## 它属于哪一类工程
 
@@ -104,7 +104,7 @@ BJM 和下面两个仓库是同一位作者的，三者各自独立，可以分�
 | [领域方法](references/methods.md) | 软件、创作、研究、文档、数据、运营和自定义领域 |
 | [脚本说明](references/runtime.md) | 需要检查证据、版本、返修次数或恢复状态时 |
 | [匿名对照材料与收票](references/blind-review.md) | 需要匿名比较两版方法的实际产出，或核对待补选票时 |
-| [图执行器 v0.1.5](graph-runtime/README.md) | 需要调度并行节点、保存执行状态和审批决定（批准或退回）时 |
+| [图执行器 v0.1.6](graph-runtime/README.md) | 需要调度并行节点、保存执行状态和审批决定（批准或退回）时 |
 
 ## 开始一个任务
 
@@ -134,7 +134,7 @@ python -m unittest discover -s tests -v
 
 要比较两版方法的实际产出时，可以用 `scripts/blind_review.py` 准备匿名对照材料，收回选票后用 `scripts/check_review_votes.py` 列出还缺哪几张、哪几张要重收，两个脚本同样只用 Python 标准库。命令、两个输出文件的规则、它查不到的线索和选票格式见[匿名对照材料与收票](references/blind-review.md)。
 
-图执行器需要 Python 3.10 或更新版本，见[图执行器说明](graph-runtime/README.md)；`scripts/` 下的三个脚本没有写最低版本。v1.9.1 的测试这次在 Linux 上跑过：`tests/` 下 53 项（BJM 36 项、匿名对照材料 12 项、收票 5 项）和图执行器 33 项，用 Python 3.11、3.12、3.13 各跑一遍，都通过；`tests/` 在 v1.8.1 时还用 Python 3.9 跑过，这次没有 3.9；Python 3.10、Windows 和 macOS 没有实测。图执行器调用 Claude Code 的测试用的是本地模拟的命令行程序，测试时命令搜索路径里只有这个模拟程序，不会启动真的 Claude Code。
+图执行器需要 Python 3.10 或更新版本，见[图执行器说明](graph-runtime/README.md)；`scripts/` 下的三个脚本没有写最低版本。v1.10.1 的测试这次在 Linux 上跑过：`tests/` 下 53 项（BJM 36 项、匿名对照材料 12 项、收票 5 项）和图执行器 38 项，用 Python 3.11、3.12、3.13 各跑一遍，都通过；`tests/` 在 v1.8.1 时还用 Python 3.9 跑过，这次没有 3.9；Python 3.10、Windows 和 macOS 没有实测。图执行器调用 Claude Code 的测试用的是本地模拟的命令行程序，测试时命令搜索路径里只有这个模拟程序，不会启动真的 Claude Code。
 
 图执行器的批准令牌是随机生成的。v1.5.1 以前，令牌约有 1/64 的机会以“-”开头，命令行会把它当成选项，报错退出（以“-h”开头时多半只打出帮助，退出码为 0），都不会批准，演示和一项测试因此偶尔失败。v1.5.1 起生成令牌时避开“-”开头，v1.8.1 起令牌一律以 `bjm_` 开头；演示这次在 Python 3.13 上连续跑了 30 次，都通过。用 v1.5.1 以前的版本建的数据库里，已经存下的以“-”开头的令牌不会自动更换，批准时写成 `approve approve -- '<令牌>'` 就行；[图执行器说明](graph-runtime/README.md)里的批准命令也都加了 `--`。
 
@@ -144,6 +144,8 @@ python -m unittest discover -s tests -v
 
 BJM 的 `scripts/workflow.py` 负责判断提交的证据和验收状态。图执行器负责节点调度和检查点，两者可按任务分别运行。需要实际模型审稿时，可显式启用 [Claude Code 审查节点](graph-runtime/README.md#使用-claude-code-并行审稿)，让两个独立会话从不同角度审同一份稿件，完成后进入 BJM 的人工审批。只有运行 `run --claude` 时，图执行器才会把稿件和审查要求发给本机另装的 Claude Code；不加 `--claude` 时，图里还有这次能轮到的审查节点，就报错停下，哪一支都不开跑；排在等待批准或被退回的审批后面的审查节点不算。真实调用没有验证过，包里的测试和演示都用本地模拟。
 
+同一张图里既有本地任务又有审查时，可以用 `run --claude --workers 4 --claude-workers 1`：同时最多跑 4 个任务节点，其中 Claude Code 审查最多 1 个，其余审查排着等，不依赖它们的本地任务照常跑。这个上限不存进数据库，每次 `run` 要限都得再加；不加时，审查和其他任务一起按 `--workers` 算。`--claude-workers` 只接受正整数；它什么时候不起作用、调度进程被强行结束以后怎样续跑，见[图执行器说明](graph-runtime/README.md#使用-claude-code-并行审稿)。
+
 ## 包内组件
 
 见[版本记录](CHANGELOG.md)。
@@ -152,7 +154,7 @@ BJM 的 `scripts/workflow.py` 负责判断提交的证据和验收状态。图�
 - Agent Skills 的 26 个模块、共享资料、脚本和许可证见 `vendor/agent-skills-0.6.17/`。从[领域方法](references/methods.md)可直接打开对应模块。
 - `vendor/agent-skills-0.6.17.zip` 是原始 ZIP，原样保留。展开目录保留全部普通文件，原包自带的一个符号链接保留在原始 ZIP 中。
 
-- 图执行器 v0.1.5 的源码、中文说明和测试在 `graph-runtime/`，从本目录运行 `python3 -B -m unittest discover -s graph-runtime/tests -v` 可复核。调用 Claude Code 的审查节点在 `graph-runtime/claude_review.py`，示例图是 `graph-runtime/examples/claude_review.json`。
+- 图执行器 v0.1.6 的源码、中文说明和测试在 `graph-runtime/`，从本目录运行 `python3 -B -m unittest discover -s graph-runtime/tests -v` 可复核。调用 Claude Code 的审查节点在 `graph-runtime/claude_review.py`，示例图是 `graph-runtime/examples/claude_review.json`。
 - 准备匿名对照材料的脚本是 `scripts/blind_review.py`，核对已收选票的脚本是 `scripts/check_review_votes.py`，说明都在 `references/blind-review.md`，测试在 `tests/test_blind_review.py` 和 `tests/test_review_votes.py`。
 
 整个目录可以独立迁移。自动发现技能或执行上游脚本时，按实际宿主配置和任务授权处理。
@@ -160,5 +162,5 @@ BJM 的 `scripts/workflow.py` 负责判断提交的证据和验收状态。图�
 ## 获取和许可
 
 - 克隆本仓库，或者从 [Releases](https://github.com/rumpelpalmour757-lgtm/bjm-portable/releases) 下载 `bjm-portable-<版本>.zip`；解压出来的 `bjm-portable/` 就是这个目录。
-- 作者：Celeste（GitHub：[rumpelpalmour757-lgtm](https://github.com/rumpelpalmour757-lgtm)）。开仓库时的整理、v1.4.1 的修改、v1.5.1、v1.8.1 和 v1.9.1 的合并与修改由 Claude 按作者的决定完成。v1.5 是 Claude 在本仓库之外做的一版，作者采纳后，v1.5.1 以它为参考合进了仓库；v1.6–v1.8 也是 Claude 在本仓库之外做的，作者采纳后，v1.8.1 把它们合进了仓库；v1.9 是作者在本仓库之外、在 v1.8 上做的一版，v1.9.1 把它新加的退回审批和 Agent Skills 0.6.17 合进了仓库。
+- 作者：Celeste（GitHub：[rumpelpalmour757-lgtm](https://github.com/rumpelpalmour757-lgtm)）。开仓库时的整理、v1.4.1 的修改、v1.5.1、v1.8.1、v1.9.1 和 v1.10.1 的合并与修改由 Claude 按作者的决定完成。v1.5 是 Claude 在本仓库之外做的一版，作者采纳后，v1.5.1 以它为参考合进了仓库；v1.6–v1.8 也是 Claude 在本仓库之外做的，作者采纳后，v1.8.1 把它们合进了仓库；v1.9 是作者在本仓库之外、在 v1.8 上做的一版，v1.9.1 把它新加的退回审批和 Agent Skills 0.6.17 合进了仓库；v1.10 是作者交来、在本仓库 v1.9.1 的发布包上做的一版，v1.10.1 把它新加的 `--claude-workers` 合进了仓库。
 - 本仓库按 MIT 许可发布，版权人 Celeste，全文见 [LICENSE](LICENSE)。附带的 Agent Skills 按它自己的 MIT 许可（Copyright (c) 2025 Addy Osmani），见 [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md)。

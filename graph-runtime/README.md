@@ -1,10 +1,10 @@
-# BJM 图工程原型 v0.1.5
+# BJM 图工程原型 v0.1.6
 
 用 BJM 的分工和验收思路跑一条可恢复的任务图。Python 标准库负责调度，SQLite 保存节点结果、审批状态和执行事件。每个数据库同一时间由一个本机进程调度，进程内可以并行跑分支。两章联审演示使用本地模拟调用，开箱即可复现分支失败和恢复。
 
 ## 快速运行
 
-本模块单独解压时，从模块根目录运行。它随 BJM 迁移包分发时，下面的逐条命令从 `bjm-portable/graph-runtime/` 目录运行。需要 Python 3.10 或更新版本。v0.1.5 这次在 Linux 上用 Python 3.11、3.12、3.13 验证过，Windows 和 macOS 没有实测。
+本模块单独解压时，从模块根目录运行。它随 BJM 迁移包分发时，下面的逐条命令从 `bjm-portable/graph-runtime/` 目录运行。需要 Python 3.10 或更新版本。v0.1.6 这次在 Linux 上用 Python 3.11、3.12、3.13 验证过，Windows 和 macOS 没有实测。
 
 ```bash
 python3 demo.py
@@ -106,6 +106,8 @@ python3 workflow.py --db "$bjm_review_db" --run-id review status
 
 示例通过 `retry_safe: true` 允许手动补跑。一支显示为 `FAILED` 时，确认可以再次计费后执行 `retry <节点>`，再用 `run --claude` 继续。已完成且输入相同的另一支会沿用原报告。示例同时设置 `retry_on_interrupt: false`：调度进程在调用期间退出（例如按了 Ctrl-C 或进程被杀）后，再次运行时这一支不会自动重发，而是进入 `UNCERTAIN`，因为那次调用可能已经计费。适配器不保存会话，报告要等 Claude Code 正常结束才交回，所以那次调用的报告和会话 ID 都找不回来，也没有外部结果可以核对。这时 `edit` 会被拦住；确认可以再次计费后，执行 `retry <节点>`，再用 `run --claude` 继续，只补跑这一支。不要用 `resolve` 填一份自拟的报告。包内测试使用本地模拟 CLI，实际模型调用待验证。
 
+图里既有本地任务又有 Claude Code 审查时，可以加 `--claude-workers N` 限定同时在跑的审查节点数，例如 `run --claude --workers 4 --claude-workers 1`：同时最多跑 4 个任务节点，其中审查节点（`operation` 为 `claude-review`）最多 1 个。到了上限，其余审查节点留在 `PENDING`，尝试次数不加；不依赖它们的本地节点照常用剩下的槽位。一个审查结束，不论成功、失败、待核还是被拒，就空出一个名额。N 须是正整数，0 或负数报错退出，库里什么也不写。这个上限算在 `--workers` 里面，比 `--workers` 大时，实际并发仍不超过 `--workers`；不加 `--claude` 时它不起作用：这次能轮到审查节点，照旧报错要求加 `--claude`；轮不到，审查一个也不跑。上限不存进数据库，每次 `run` 要限都得再加，不加时审查和其他任务一起只按 `--workers` 算。用示例图时，两个审查会一个跑完再跑另一个。调度进程被强行结束以后（例如 `kill -9`），它启动的 Claude Code 进程可能还在跑，这些进程不算进下一次 `run` 的上限；要守住上限，先确认上次的调用已经结束，再续跑。
+
 [Claude Code 子代理](https://code.claude.com/docs/en/sub-agents) · [CLI 参数参考](https://code.claude.com/docs/en/cli-reference) · [非交互运行与 Bare 模式](https://code.claude.com/docs/en/headless)
 
 ## 接到实际任务时
@@ -120,6 +122,7 @@ python3 workflow.py --db "$bjm_review_db" --run-id review status
 ## 设计参考
 
 - Google ADK 的图工作流实战把流程分成明确节点，示范并行分支、汇总和人工审批。 [Graph Workflows in ADK](https://cloud.google.com/blog/topics/developers-practitioners/graph-workflows-in-adk-everything-you-need-to-know/)
+- Google ADK v2.15.0 给 `LlmAgent` 加了 `max_parallel_workers`，限定一个并行工作节点同时处理几条输入，不管整个工作流。`--claude-workers` 参考了在总并发之外给一类工作另设上限的做法，但管的是整次运行里所有 Claude Code 审查节点，代码按 BJM 的调度器另写。 [ADK v2.15.0](https://github.com/google/adk-python/releases/tag/v2.15.0) · [提交 5e4f0e1](https://github.com/google/adk-python/commit/5e4f0e18cfe869a183901192f92c86d7574881b0)
 - LangGraph 的中断与恢复提供了对照，特别是审批返回后节点可能重入，以及过期审批应被拒绝。 [Interrupts](https://docs.langchain.com/oss/python/langgraph/interrupts) · [LangGraph 发行记录](https://github.com/langchain-ai/langgraph/releases)
 - Temporal 的持久执行和 Worker 版本固定用于参考进程恢复、外部调用和运行版本之间的边界。 [AI Framework Integrations](https://temporal.io/blog/ai-framework-integrations) · [Worker Versioning](https://docs.temporal.io/worker-versioning)
 - OpenAI 的 Trace Grading 提供了依据执行过程定位问题的思路。本原型记录可供核查的事件，事件评分可由接入方另行实现。 [Trace Grading](https://developers.openai.com/api/docs/guides/trace-grading)

@@ -1,5 +1,6 @@
 """Single-host graph scheduler with SQLite checkpoints and explicit approvals."""
 
+from collections.abc import Mapping
 from concurrent.futures import FIRST_COMPLETED, ThreadPoolExecutor, wait
 from contextlib import contextmanager
 from datetime import datetime, timezone
@@ -287,9 +288,16 @@ class Engine:
             self._event(db, run_id, node_id, "RECOVERED" if safe else "UNCERTAIN", attempt=row["attempt"])
         db.commit()
 
-    def run(self, run_id, handler, workers=2, *, preflight=None):
+    def run(self, run_id, handler, workers=2, *, preflight=None, worker_limits=None):
+        """Dispatch tasks with an optional concurrency limit per inputs.operation."""
         if type(workers) is not int or workers < 1:
             raise ValueError("workers must be a positive integer")
+        limits = {} if worker_limits is None else worker_limits
+        if not isinstance(limits, Mapping) or any(
+                not isinstance(name, str) or type(limit) is not int or limit < 1
+                for name, limit in limits.items()):
+            raise ValueError("operation worker limits must be positive integers")
+        limits = dict(limits)
         with self._write() as db, ThreadPoolExecutor(max_workers=workers) as pool:
             version = self._run_info(db, run_id)["version"]
             nodes = self._nodes(db, run_id)
@@ -298,6 +306,7 @@ class Engine:
                 preflight(queued, self._runnable(nodes, queued))
             self._recover(db, run_id, nodes)
             futures = {}
+            in_flight = dict.fromkeys(limits, 0)
             while True:
                 nodes = self._nodes(db, run_id)
                 for node_id, row in nodes.items():
@@ -306,8 +315,15 @@ class Engine:
                     spec = _decode(row["spec"])
                     if any(nodes[dep]["status"] != "SUCCEEDED" for dep in spec["deps"]):
                         continue
-                    if spec["kind"] == "task" and len(futures) >= workers:
-                        continue
+                    group = None
+                    if spec["kind"] == "task":
+                        if len(futures) >= workers:
+                            continue
+                        operation = spec["inputs"].get("operation")
+                        if isinstance(operation, str) and operation in limits:
+                            if in_flight[operation] >= limits[operation]:
+                                continue
+                            group = operation
                     fingerprint = self._fingerprint(run_id, version, row, spec, nodes)
                     if spec["kind"] == "approval":
                         content = self._approval_content(spec, nodes)
@@ -333,12 +349,16 @@ class Engine:
                         self._event(db, run_id, node_id, "STARTED", attempt=attempt, fingerprint=fingerprint)
                         db.commit()
                         inputs = {dep: _decode(nodes[dep]["output"]) for dep in spec["deps"]}
-                        futures[pool.submit(handler, spec, inputs)] = (node_id, attempt, spec["retry_safe"])
+                        futures[pool.submit(handler, spec, inputs)] = (node_id, attempt, spec["retry_safe"], group)
+                        if group is not None:
+                            in_flight[group] += 1
                 if not futures:
                     break
                 finished, _ = wait(futures, return_when=FIRST_COMPLETED)
                 for future in finished:
-                    node_id, attempt, safe = futures.pop(future)
+                    node_id, attempt, safe, group = futures.pop(future)
+                    if group is not None:
+                        in_flight[group] -= 1
                     try:
                         output = _json(future.result())
                         output.encode("utf-8")
