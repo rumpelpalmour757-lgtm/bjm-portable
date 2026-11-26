@@ -24,7 +24,7 @@
 
 ## 可选的 Agent Skills 工程方法索引
 
-本包内置 [Agent Skills 0.6.18](https://github.com/addyosmani/agent-skills/releases/tag/0.6.18)。按下表只打开本轮需要的模块，模块的共享资料、模板和脚本沿用原目录结构；用到共享资料的 12 个模块另在自己的 `references/shared/` 下各带一份副本，和 `vendor/agent-skills-0.6.18/references/` 里的原件逐字节相同，只取一个模块时也能打开。把模块中的技术方法用到本轮任务，验收、权限和返修仍按 BJM 执行。需要调用脚本时，先按目标环境的授权和依赖核对。
+本包内置 [Agent Skills 0.6.18](https://github.com/addyosmani/agent-skills/releases/tag/0.6.18)。按下表只打开本轮需要的模块，模块的共享资料、模板和脚本沿用原目录结构；用到共享资料的 12 个模块另在自己的 `references/shared/` 下各带一份所用共享资料的副本（12 个模块共 16 份），和 `vendor/agent-skills-0.6.18/references/` 里的原件逐字节相同，只取一个模块时也能打开。把模块中的技术方法用到本轮任务，验收、权限和返修仍按 BJM 执行。需要调用脚本时，先按目标环境的授权和依赖核对。
 
 | 需要补充的方法 | 模块名 |
 |---|---|
