@@ -1,0 +1,46 @@
+# 自动测试。
+# 推送到任何分支、开拉取请求或更新拉取请求时，在 Python 3.10 和 3.12 上各跑一遍两组测试：
+# tests/（BJM 和匿名对照材料）和 graph-runtime/tests/（图执行器）。也可以在 Actions 页手动运行。
+# 测试只用 Python 标准库，不装依赖；命令和 README 里“可选的本地核验”一样，从仓库根目录运行。
+# 同一个分支或拉取请求有新的推送时，取消还没跑完的旧运行；main 上每次运行各自一组，不取消、不被顶替，每个提交都有结果。
+# .gitattributes 里 /.github 标了 export-ignore，这个文件不进发布包。
+name: 测试
+on:
+  push:
+    # 只写 branches 时推送标签不触发。
+    branches: ["**"]
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  # 同一组里只留一次在跑、一次排队，新来的会顶掉排队的那次；所以 main 用运行编号单独成组。
+  group: ${{ github.workflow }}-${{ github.ref == 'refs/heads/main' && github.run_id || github.ref }}
+  cancel-in-progress: true
+jobs:
+  test:
+    name: Python ${{ matrix.python-version }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    strategy:
+      # 一个版本失败时，另一个版本照样跑完，便于对照。
+      fail-fast: false
+      matrix:
+        python-version: ["3.10", "3.12"]
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-python@v6
+        id: python
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: 跑 tests/（BJM 和匿名对照材料）
+        run: python -B -m unittest discover -s tests -v
+
+      # 上一组失败时这一组照样跑，两组的结果都看得到。
+      - name: 跑 graph-runtime/tests/（图执行器）
+        if: ${{ !cancelled() && steps.python.outcome == 'success' }}
+        run: python -B -m unittest discover -s graph-runtime/tests -v
