@@ -57,6 +57,34 @@ class WorkflowCLITest(unittest.TestCase):
         graph.write_text(json.dumps({"version": "test-graph", "nodes": nodes}), encoding="utf-8")
         return str(graph)
 
+    def test_only_init_prepares_an_empty_database(self):
+        db_path = self.workspace / "workflow.db"
+        db_path.touch()
+        for args, message in (
+            (("status",), "database is not initialized"),
+            (("events",), "database is not initialized"),
+            (("events", "--after", "-1"), "database is not initialized"),
+            (("run",), "database is not initialized"),
+            (("retry", "review-b"), "database is not initialized"),
+            (("edit", "draft-b", "{}"), "database is not initialized"),
+            (("approve", "approve", "--", "bjm_x"), "database is not initialized"),
+            (("reject", "approve", "--", "bjm_x"), "database is not initialized"),
+            (("resolve", "review-b", "{}"), "database is not initialized"),
+            (("run", "--workers", "0"), "--workers must be a positive integer"),
+            (("run", "--claude-workers", "0"), "--claude-workers must be a positive integer"),
+        ):
+            with self.subTest(args=args):
+                error = self.cli(*args, expected=2)
+                self.assertTrue(error.startswith(f"workflow: {message}"), error)
+                self.assertEqual(db_path.read_bytes(), b"")
+                self.assertEqual(list(self.workspace.iterdir()), [db_path])
+
+        initialized = self.cli("init", str(TWO_CHAPTERS))
+        self.assertEqual(self.cli("status"), initialized)
+        self.assertTrue(self.cli("events"))
+        self.assertGreater(db_path.stat().st_size, 0)
+        self.assertTrue(db_path.with_suffix(".db.lock").is_file())
+
     @contextmanager
     def running_process(self, node):
         process = subprocess.Popen(
@@ -103,6 +131,70 @@ class WorkflowCLITest(unittest.TestCase):
         ids = [event["id"] for event in after]
         self.assertEqual(ids, sorted(set(ids)))
         self.assertTrue(any(event["node_id"] == "review-b" for event in after[len(before) :]))
+
+    def test_events_cursor_pages_a_single_run_and_resumes_after_new_events(self):
+        self.cli("init", str(TWO_CHAPTERS))
+        coordinator = engine.Engine(self.workspace / "workflow.db")
+        coordinator.init("another-run", json.loads(TWO_CHAPTERS.read_text(encoding="utf-8")))
+        self.cli("run", "--workers", "2", "--fail-before", "review-b")
+        original = self.cli("events")
+        self.assertGreater(len(original), 2)
+        other_id = coordinator.events("another-run")[0]["id"]
+        self.assertLess(original[0]["id"], other_id)
+        self.assertLess(other_id, original[1]["id"])
+
+        first_page = self.cli("events", "--after", "0", "--limit", "2")
+        self.assertEqual(first_page, original[:2])
+        self.assertEqual(self.cli("events", "--after", "0", "--limit", "2"), first_page)
+        self.assertEqual(self.cli("events", "--after", str(first_page[-1]["id"])), original[2:])
+        tail = str(original[-1]["id"])
+        self.assertEqual(self.cli("events", "--after", tail, "--limit", "2"), [])
+
+        self.cli("retry", "review-b")
+        self.cli("run", "--workers", "2")
+        complete = self.cli("events")
+        new_events = self.cli("events", "--after", tail)
+        self.assertEqual(complete, original + new_events)
+        self.assertTrue(new_events)
+        self.assertEqual(self.cli("events", "--after", "0", "--limit", "2"), first_page)
+
+        reconstructed = []
+        cursor = 0
+        for _ in range(len(complete) + 1):
+            page = self.cli("events", "--after", str(cursor), "--limit", "2")
+            if not page:
+                break
+            self.assertLess(cursor, page[0]["id"])
+            self.assertLessEqual(len(page), 2)
+            reconstructed.extend(page)
+            cursor = page[-1]["id"]
+        else:
+            self.fail("event pagination did not reach the tail")
+        self.assertEqual(reconstructed, complete)
+        self.assertTrue(all(row["run_id"] == "demo" for row in reconstructed))
+
+    def test_event_cursor_options_reject_out_of_range_values(self):
+        self.cli("init", str(TWO_CHAPTERS))
+        original = self.cli("events")
+        too_large = str(1 << 63)
+        for args, message in (
+            (("--after", "-1"), "after must be"),
+            (("--after", too_large), "after must be"),
+            (("--limit", "1"), "limit requires an after cursor"),
+            (("--after", "0", "--limit", "0"), "limit must be"),
+            (("--after", "0", "--limit", "-1"), "limit must be"),
+            (("--after", "0", "--limit", too_large), "limit must be"),
+        ):
+            with self.subTest(args=args):
+                self.assertIn(message, self.cli("events", *args, expected=2))
+        self.assertEqual(self.cli("events"), original)
+        self.assertEqual(self.cli("events", "--after", str((1 << 63) - 1)), [])
+
+        coordinator = engine.Engine(self.workspace / "workflow.db")
+        with self.assertRaisesRegex(ValueError, "after must be"):
+            coordinator.events("demo", after=True)
+        with self.assertRaisesRegex(ValueError, "limit must be"):
+            coordinator.events("demo", after=0, limit=False)
 
     def test_revising_one_chapter_invalidates_its_review_and_old_approval(self):
         self.cli("init", str(TWO_CHAPTERS))

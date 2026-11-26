@@ -1,10 +1,10 @@
-# BJM 图工程原型 v0.1.7
+# BJM 图工程原型 v0.1.9
 
 用 BJM 的分工和验收思路跑一条可恢复的任务图。Python 标准库负责调度，SQLite 保存节点结果、审批状态和执行事件。每个数据库同一时间由一个本机进程调度，进程内可以并行跑分支。两章联审演示使用本地模拟调用，开箱即可复现分支失败和恢复。
 
 ## 快速运行
 
-本模块单独解压时，从模块根目录运行。它随 BJM 迁移包分发时，下面的逐条命令从 `bjm-portable/graph-runtime/` 目录运行。需要 Python 3.10 或更新版本。v0.1.7 这次在 Linux 上用 Python 3.11、3.12、3.13 验证过，Windows 和 macOS 没有实测。
+本模块单独解压时，从模块根目录运行。它随 BJM 迁移包分发时，下面的逐条命令从 `bjm-portable/graph-runtime/` 目录运行。需要 Python 3.10 或更新版本。v0.1.9 这次在 Linux 上用 Python 3.11、3.12、3.13 验证过，Windows 和 macOS 没有实测。
 
 ```bash
 python3 demo.py
@@ -25,6 +25,8 @@ python3 workflow.py --db "$bjm_demo_db" --run-id demo events
 ```
 
 `--fail-before review-b` 在第二章审查的模拟调用开始前制造失败。第一次 `run` 后以 `status` 的节点状态判断结果，命令正常退出只表示返回了运行信息。随后几个命令启动新的进程，使用同一个 SQLite 文件继续工作。
+
+数据库要先用 `init` 建好。`init` 以外的命令遇到不存在的文件，或者没有初始化过的文件（空文件，或者别的程序建的、`user_version` 为 0 的 SQLite 库），都报错退出，退出码 2，不改这个文件，也不留下锁文件 `<数据库文件名>.lock`；本仓库 v1.10.1 遇到空文件时，会先写进表结构、留下锁文件，再报错。`run` 在打开数据库以前就检查 `--workers` 和 `--claude-workers` 是不是正整数。在 Python 里直接用 `Engine(路径)` 仍和以前一样，遇到没初始化的库会建表；要和命令行一样只认已经初始化的库，写成 `Engine(路径, initialize=False)`。
 
 ## 验证审批绑定
 
@@ -67,6 +69,16 @@ python3 workflow.py --db "$bjm_demo_db" --run-id demo reject approve -- '<编辑
 数据库经过不按内容对照的版本（v1.8.1、作者的 v1.8 和 v1.9）以后，那些版本可能对退回过的同一份内容发了令牌。回到这一版，用这样的令牌 `approve` 会被拒，报 `the same content was rejected at revision N`，库里什么也不写；`reject` 照常可以用。在那些版本里已经批准了的，这一版不会改回去。
 
 图执行器不记退回的理由，理由要另外记下来交给改稿的人。依赖被退回的审批、这次运行轮不到的 Claude Code 审查节点，不要求加 `--claude`，无关分支照常能跑；等审批通过、轮到审查节点时，才要 `run --claude`。不过每次 `run` 都先核对所有还没跑的审查节点的声明，轮不到的也查，声明不合格（例如 `edit` 把 `focus` 改成空的）就报错退出，见下面“使用 Claude Code 并行审稿”。
+
+## 分页读取执行记录
+
+`events` 打出这个运行的全部事件。要接着上次读到的地方往下读（例如一边 `run` 一边轮询），加 `--after`：
+
+```bash
+python3 workflow.py --db "$bjm_demo_db" --run-id demo events --after 0 --limit 100
+```
+
+`--after` 填上一页最后一条事件的 `id`，只返回 ID 比它大的事件，第一次用 `0`。结果和不加 `--after` 时一样，是按 ID 从小到大排的 JSON 数组。同一个数据库里的几个运行共用一串事件 ID，所以一个运行的 ID 会跳号，这是正常的。没有新事件时返回 `[]`，游标不用动，等有了新事件再读。`--limit N` 一次最多返回 N 条，可以不加；加的话只能和 `--after` 一起用，单独加会报 `limit requires an after cursor`。`--after` 须是 0 或正整数，`--limit` 须是正整数，不合格都报错退出，退出码 2。
 
 ## 运行回归测试
 

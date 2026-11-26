@@ -24,19 +24,19 @@
 
 ## 可选的 Agent Skills 工程方法索引
 
-本包内置 [Agent Skills 0.6.17](https://github.com/addyosmani/agent-skills/releases/tag/0.6.17)。按下表只打开本轮需要的模块，模块的共享资料、模板和脚本沿用原目录结构。把模块中的技术方法用到本轮任务，验收、权限和返修仍按 BJM 执行。需要调用脚本时，先按目标环境的授权和依赖核对。
+本包内置 [Agent Skills 0.6.18](https://github.com/addyosmani/agent-skills/releases/tag/0.6.18)。按下表只打开本轮需要的模块，模块的共享资料、模板和脚本沿用原目录结构；用到共享资料的 12 个模块另在自己的 `references/shared/` 下各带一份所用共享资料的副本（12 个模块共 16 份），和 `vendor/agent-skills-0.6.18/references/` 里的原件逐字节相同，只取一个模块时也能打开。把模块中的技术方法用到本轮任务，验收、权限和返修仍按 BJM 执行。需要调用脚本时，先按目标环境的授权和依赖核对。
 
 | 需要补充的方法 | 模块名 |
 |---|---|
-| 探索问题、澄清需求或审视判断 | [idea-refine](../vendor/agent-skills-0.6.17/skills/idea-refine/SKILL.md)、[interview-me](../vendor/agent-skills-0.6.17/skills/interview-me/SKILL.md)、[doubt-driven-development](../vendor/agent-skills-0.6.17/skills/doubt-driven-development/SKILL.md) |
-| 选择方法或管理上下文 | [using-agent-skills](../vendor/agent-skills-0.6.17/skills/using-agent-skills/SKILL.md)、[context-engineering](../vendor/agent-skills-0.6.17/skills/context-engineering/SKILL.md) |
-| 定义需求、约束和任务拆分 | [spec-driven-development](../vendor/agent-skills-0.6.17/skills/spec-driven-development/SKILL.md)、[constraint-driven-development](../vendor/agent-skills-0.6.17/skills/constraint-driven-development/SKILL.md)、[planning-and-task-breakdown](../vendor/agent-skills-0.6.17/skills/planning-and-task-breakdown/SKILL.md) |
-| 实现、测试或排查故障 | [incremental-implementation](../vendor/agent-skills-0.6.17/skills/incremental-implementation/SKILL.md)、[test-driven-development](../vendor/agent-skills-0.6.17/skills/test-driven-development/SKILL.md)、[debugging-and-error-recovery](../vendor/agent-skills-0.6.17/skills/debugging-and-error-recovery/SKILL.md) |
-| 审查质量、安全、复杂度或性能 | [code-review-and-quality](../vendor/agent-skills-0.6.17/skills/code-review-and-quality/SKILL.md)、[security-and-hardening](../vendor/agent-skills-0.6.17/skills/security-and-hardening/SKILL.md)、[code-simplification](../vendor/agent-skills-0.6.17/skills/code-simplification/SKILL.md)、[performance-optimization](../vendor/agent-skills-0.6.17/skills/performance-optimization/SKILL.md) |
-| 设计、实现或检查界面 | [api-and-interface-design](../vendor/agent-skills-0.6.17/skills/api-and-interface-design/SKILL.md)、[frontend-ui-engineering](../vendor/agent-skills-0.6.17/skills/frontend-ui-engineering/SKILL.md)、[browser-testing-with-devtools](../vendor/agent-skills-0.6.17/skills/browser-testing-with-devtools/SKILL.md) |
-| 审查现有界面的无障碍问题 | [accessibility-engineering](../vendor/agent-skills-0.6.17/skills/accessibility-engineering/SKILL.md) |
-| 核对版本化来源或筹划迁移 | [source-driven-development](../vendor/agent-skills-0.6.17/skills/source-driven-development/SKILL.md)、[deprecation-and-migration](../vendor/agent-skills-0.6.17/skills/deprecation-and-migration/SKILL.md) |
-| 记录决策或管理版本 | [documentation-and-adrs](../vendor/agent-skills-0.6.17/skills/documentation-and-adrs/SKILL.md)、[git-workflow-and-versioning](../vendor/agent-skills-0.6.17/skills/git-workflow-and-versioning/SKILL.md) |
-| 观察、自动化或发布系统 | [observability-and-instrumentation](../vendor/agent-skills-0.6.17/skills/observability-and-instrumentation/SKILL.md)、[ci-cd-and-automation](../vendor/agent-skills-0.6.17/skills/ci-cd-and-automation/SKILL.md)、[shipping-and-launch](../vendor/agent-skills-0.6.17/skills/shipping-and-launch/SKILL.md) |
+| 探索问题、澄清需求或审视判断 | [idea-refine](../vendor/agent-skills-0.6.18/skills/idea-refine/SKILL.md)、[interview-me](../vendor/agent-skills-0.6.18/skills/interview-me/SKILL.md)、[doubt-driven-development](../vendor/agent-skills-0.6.18/skills/doubt-driven-development/SKILL.md) |
+| 选择方法或管理上下文 | [using-agent-skills](../vendor/agent-skills-0.6.18/skills/using-agent-skills/SKILL.md)、[context-engineering](../vendor/agent-skills-0.6.18/skills/context-engineering/SKILL.md) |
+| 定义需求、约束和任务拆分 | [spec-driven-development](../vendor/agent-skills-0.6.18/skills/spec-driven-development/SKILL.md)、[constraint-driven-development](../vendor/agent-skills-0.6.18/skills/constraint-driven-development/SKILL.md)、[planning-and-task-breakdown](../vendor/agent-skills-0.6.18/skills/planning-and-task-breakdown/SKILL.md) |
+| 实现、测试或排查故障 | [incremental-implementation](../vendor/agent-skills-0.6.18/skills/incremental-implementation/SKILL.md)、[test-driven-development](../vendor/agent-skills-0.6.18/skills/test-driven-development/SKILL.md)、[debugging-and-error-recovery](../vendor/agent-skills-0.6.18/skills/debugging-and-error-recovery/SKILL.md) |
+| 审查质量、安全、复杂度或性能 | [code-review-and-quality](../vendor/agent-skills-0.6.18/skills/code-review-and-quality/SKILL.md)、[security-and-hardening](../vendor/agent-skills-0.6.18/skills/security-and-hardening/SKILL.md)、[code-simplification](../vendor/agent-skills-0.6.18/skills/code-simplification/SKILL.md)、[performance-optimization](../vendor/agent-skills-0.6.18/skills/performance-optimization/SKILL.md) |
+| 设计、实现或检查界面 | [api-and-interface-design](../vendor/agent-skills-0.6.18/skills/api-and-interface-design/SKILL.md)、[frontend-ui-engineering](../vendor/agent-skills-0.6.18/skills/frontend-ui-engineering/SKILL.md)、[browser-testing-with-devtools](../vendor/agent-skills-0.6.18/skills/browser-testing-with-devtools/SKILL.md) |
+| 审查现有界面的无障碍问题 | [accessibility-engineering](../vendor/agent-skills-0.6.18/skills/accessibility-engineering/SKILL.md) |
+| 核对版本化来源或筹划迁移 | [source-driven-development](../vendor/agent-skills-0.6.18/skills/source-driven-development/SKILL.md)、[deprecation-and-migration](../vendor/agent-skills-0.6.18/skills/deprecation-and-migration/SKILL.md) |
+| 记录决策或管理版本 | [documentation-and-adrs](../vendor/agent-skills-0.6.18/skills/documentation-and-adrs/SKILL.md)、[git-workflow-and-versioning](../vendor/agent-skills-0.6.18/skills/git-workflow-and-versioning/SKILL.md) |
+| 观察、自动化或发布系统 | [observability-and-instrumentation](../vendor/agent-skills-0.6.18/skills/observability-and-instrumentation/SKILL.md)、[ci-cd-and-automation](../vendor/agent-skills-0.6.18/skills/ci-cd-and-automation/SKILL.md)、[shipping-and-launch](../vendor/agent-skills-0.6.18/skills/shipping-and-launch/SKILL.md) |
 
 Agent Skills 由 Addy Osmani 发布，采用 MIT 许可。
