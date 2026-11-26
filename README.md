@@ -104,7 +104,7 @@ BJM 和下面两个仓库是同一位作者的，三者各自独立，可以分�
 | [领域方法](references/methods.md) | 软件、创作、研究、文档、数据、运营和自定义领域 |
 | [脚本说明](references/runtime.md) | 需要检查证据、版本、返修次数或恢复状态时 |
 | [匿名对照材料与收票](references/blind-review.md) | 需要匿名比较两版方法的实际产出，或核对待补选票时 |
-| [图执行器 v0.1.6](graph-runtime/README.md) | 需要调度并行节点、保存执行状态和审批决定（批准或退回）时 |
+| [图执行器 v0.1.7](graph-runtime/README.md) | 需要调度并行节点、保存执行状态和审批决定（批准或退回）时 |
 
 ## 开始一个任务
 
@@ -154,7 +154,7 @@ BJM 的 `scripts/workflow.py` 负责判断提交的证据和验收状态。图�
 - Agent Skills 的 26 个模块、共享资料、脚本和许可证见 `vendor/agent-skills-0.6.17/`。从[领域方法](references/methods.md)可直接打开对应模块。
 - `vendor/agent-skills-0.6.17.zip` 是原始 ZIP，原样保留。展开目录保留全部普通文件，原包自带的一个符号链接保留在原始 ZIP 中。
 
-- 图执行器 v0.1.6 的源码、中文说明和测试在 `graph-runtime/`，从本目录运行 `python3 -B -m unittest discover -s graph-runtime/tests -v` 可复核。调用 Claude Code 的审查节点在 `graph-runtime/claude_review.py`，示例图是 `graph-runtime/examples/claude_review.json`。
+- 图执行器 v0.1.7 的源码、中文说明和测试在 `graph-runtime/`，从本目录运行 `python3 -B -m unittest discover -s graph-runtime/tests -v` 可复核。调用 Claude Code 的审查节点在 `graph-runtime/claude_review.py`，示例图是 `graph-runtime/examples/claude_review.json`。
 - 准备匿名对照材料的脚本是 `scripts/blind_review.py`，核对已收选票的脚本是 `scripts/check_review_votes.py`，说明都在 `references/blind-review.md`，测试在 `tests/test_blind_review.py` 和 `tests/test_review_votes.py`。
 
 整个目录可以独立迁移。自动发现技能或执行上游脚本时，按实际宿主配置和任务授权处理。
